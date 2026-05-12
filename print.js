@@ -63,8 +63,8 @@ async function printTickets(tickets, cashierName) {
         const qrContainer = label.querySelector('.qr-container');
         new QRCode(qrContainer, {
             text: ticket.ticket_code,
-            width: 60,
-            height: 60,
+            width: 50,
+            height: 50,
             colorDark : "#000000",
             colorLight : "#ffffff",
             correctLevel : QRCode.CorrectLevel.M
