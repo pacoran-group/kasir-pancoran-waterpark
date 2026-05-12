@@ -354,45 +354,46 @@ hr {
         display: flex;
         flex-direction: column;
         justify-content: center;
-        padding-left: 2mm;
+        padding-left: 3mm;
         height: 100%;
         overflow: hidden;
     }
     
     .ticket-details h1 {
-        font-size: 5px;
+        font-size: 5.5px;
         margin: 0;
         font-weight: 800;
-        line-height: 1;
-        letter-spacing: -0.1px;
+        line-height: 1.2;
+        letter-spacing: 0.1px;
     }
     .ticket-details h2 {
-        font-size: 4.5px;
-        margin: 0 0 1px 0;
+        font-size: 5px;
+        margin: 0 0 0.3mm 0;
         font-weight: 600;
-        line-height: 1;
+        line-height: 1.1;
     }
 
     .ticket-type {
-        font-size: 7.5px;
-        font-weight: 800;
-        margin: 0;
+        font-size: 8.5px;
+        font-weight: 900;
+        margin: 0.2mm 0;
         line-height: 1;
     }
 
     .ticket-price {
-        font-size: 6px;
-        margin: 1px 0 1px 0;
+        font-size: 6.5px;
+        margin: 0.2mm 0 0.5mm 0;
         line-height: 1;
         font-weight: 600;
     }
     
     .ticket-footer {
         font-size: 3.5px;
-        line-height: 1.1;
+        line-height: 1;
         color: #000;
-        margin-top: 0px;
+        margin-top: 0.5mm;
         display: flex;
-        gap: 3px;
+        gap: 4px;
+        opacity: 0.8;
     }
 }
