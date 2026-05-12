@@ -309,22 +309,22 @@ hr {
     body > *:not(#print-area) { display: none !important; }
     #print-area { display: block !important; margin: 0; padding: 0; }
     
-    @page {
-        size: 50mm 20mm;
-        margin: 0;
-    }
-    
     .ticket-label {
         width: 50mm;
-        height: 20mm;
+        height: 15mm;
         box-sizing: border-box;
         page-break-after: always;
         font-family: 'Inter', Arial, sans-serif;
         color: #000;
         overflow: hidden;
-        padding: 2mm;
+        padding: 0.5mm 1.5mm;
         display: block;
         background: white;
+    }
+
+    @page {
+        size: 50mm 15mm;
+        margin: 0;
     }
 
     .ticket-content {
@@ -337,15 +337,15 @@ hr {
     }
 
     .qr-wrapper {
-        flex: 0 0 14mm;
+        flex: 0 0 12mm;
         display: flex;
         justify-content: center;
         align-items: center;
     }
 
     .qr-container img, .qr-container canvas {
-        width: 14mm;
-        height: 14mm;
+        width: 12mm;
+        height: 12mm;
         display: block;
     }
 
@@ -354,43 +354,45 @@ hr {
         display: flex;
         flex-direction: column;
         justify-content: center;
-        padding-left: 3mm;
+        padding-left: 2mm;
         height: 100%;
         overflow: hidden;
     }
     
     .ticket-details h1 {
-        font-size: 6px;
+        font-size: 5px;
         margin: 0;
         font-weight: 800;
         line-height: 1;
         letter-spacing: -0.1px;
     }
     .ticket-details h2 {
-        font-size: 5.5px;
+        font-size: 4.5px;
         margin: 0 0 1px 0;
         font-weight: 600;
         line-height: 1;
     }
 
     .ticket-type {
-        font-size: 8px;
+        font-size: 7.5px;
         font-weight: 800;
         margin: 0;
-        line-height: 1.1;
+        line-height: 1;
     }
 
     .ticket-price {
-        font-size: 6.5px;
+        font-size: 6px;
         margin: 1px 0 1px 0;
         line-height: 1;
         font-weight: 600;
     }
     
     .ticket-footer {
-        font-size: 4px;
+        font-size: 3.5px;
         line-height: 1.1;
         color: #000;
-        margin-top: 1px;
+        margin-top: 0px;
+        display: flex;
+        gap: 3px;
     }
 }
