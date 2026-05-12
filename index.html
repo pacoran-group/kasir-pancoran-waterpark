@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Kasir - Pancoran Waterpark</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Dexie.js for IndexedDB -->
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- QRCode.js for generating QR codes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Loader / Sync Indicator -->
+        <div id="sync-status" class="sync-status">
+            <span class="indicator online"></span> Online
+        </div>
+
+        <!-- 1. LOGIN SCREEN -->
+        <section id="login-screen" class="screen active">
+            <div class="login-container">
+                <div class="login-logos">
+                    <img src="Logo%20Pancoran%20Waterpark.webp" alt="Pancoran Waterpark" class="logo-unit">
+                    <img src="Logo%20Pancoran%20Group.webp" alt="Pancoran Group" class="logo-holdings">
+                </div>
+                <h2>Pancoran Waterpark</h2>
+                <h3>Sistem Kasir</h3>
+                <form id="login-form" onsubmit="return false;">
+                    <div class="form-group">
+                        <label for="cashier-select">Pilih Kasir</label>
+                        <select id="cashier-select">
+                            <option value="">-- Pilih Nama --</option>
+                            <!-- Options will be populated from DB -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pin-input">PIN</label>
+                        <input type="password" id="pin-input" placeholder="Masukkan PIN 4-6 digit" maxlength="6" onkeydown="if(event.key === 'Enter') handleLogin(event)">
+                    </div>
+                    <button type="button" id="login-btn" class="btn primary" onclick="handleLogin(event)">Login / Buka Shift</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- 2. CASHIER DASHBOARD -->
+        <section id="cashier-screen" class="screen">
+            <header>
+                <div class="header-left">
+                    <img src="Logo%20Pancoran%20Waterpark.webp" alt="Pancoran Waterpark" class="header-logo">
+                    <div>
+                        <h2>Pancoran Waterpark</h2>
+                        <p>Shift: <span id="current-shift-time"></span> | Kasir: <span id="current-cashier-name"></span></p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <img src="Logo%20Pancoran%20Group.webp" alt="Pancoran Group" class="header-logo">
+                    <button id="close-shift-btn" class="btn danger">Closing Shift</button>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Left Panel: Transaction Form -->
+                <div class="panel transaction-form">
+                    <h3>Transaksi Baru</h3>
+
+                    <div class="form-group">
+                        <label>Dewasa (Rp 28.000)</label>
+                        <div class="counter">
+                            <button class="btn-count" onclick="updateCount('adult', -1)">-</button>
+                            <input type="number" id="adult-count" value="1" min="0" readonly>
+                            <button class="btn-count" onclick="updateCount('adult', 1)">+</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Anak < 5 thn (Rp 10.000)</label>
+                                <div class="counter">
+                                    <button class="btn-count" onclick="updateCount('child', -1)">-</button>
+                                    <input type="number" id="child-count" value="0" min="0" readonly>
+                                    <button class="btn-count" onclick="updateCount('child', 1)">+</button>
+                                </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Gratis / VIP (Rp 0)</label>
+                        <div class="counter">
+                            <button class="btn-count" onclick="updateCount('free', -1)">-</button>
+                            <input type="number" id="free-count" value="0" min="0" readonly>
+                            <button class="btn-count" onclick="updateCount('free', 1)">+</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="visitor-source">Sumber Pengunjung</label>
+                        <select id="visitor-source">
+                            <option value="walk-in">Walk-in</option>
+                            <option value="rombongan">Rombongan</option>
+                            <option value="travel-agent">Travel Agent</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payment-method">Metode Pembayaran</label>
+                        <div class="payment-methods">
+                            <label><input type="radio" name="payment" value="cash" checked> Cash</label>
+                            <label><input type="radio" name="payment" value="qris"> QRIS</label>
+                            <label><input type="radio" name="payment" value="transfer"> Transfer</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Order Summary -->
+                <div class="panel order-summary">
+                    <h3>Ringkasan Transaksi</h3>
+                    <div class="summary-details">
+                        <div class="summary-row">
+                            <span>Total Pengunjung</span>
+                            <span id="summary-guests">1 Orang</span>
+                        </div>
+                        <hr>
+                        <div class="summary-row">
+                            <span>Subtotal</span>
+                            <span id="summary-subtotal">Rp 28.000</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Diskon/Promo</span>
+                            <span id="summary-discount">Rp 0</span>
+                        </div>
+                        <hr>
+                        <div class="summary-row total">
+                            <span>Total Bayar</span>
+                            <span id="summary-total">Rp 28.000</span>
+                        </div>
+                    </div>
+
+                    <button id="process-payment-btn" class="btn primary large">Proses Pembayaran & Cetak QR</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. CLOSING SHIFT SCREEN -->
+        <section id="closing-screen" class="screen">
+            <div class="closing-container">
+                <h2>Closing Shift</h2>
+                <div class="closing-summary">
+                    <h3>Rekap Penjualan (Sistem)</h3>
+                    <div class="summary-row"><span>Total Transaksi</span> <span id="close-total-orders">0</span></div>
+                    <div class="summary-row"><span>Cash</span> <span id="close-system-cash">Rp 0</span></div>
+                    <div class="summary-row"><span>QRIS</span> <span id="close-system-qris">Rp 0</span></div>
+                    <div class="summary-row"><span>Transfer</span> <span id="close-system-transfer">Rp 0</span></div>
+                </div>
+
+                <div class="closing-form">
+                    <h3>Hitung Fisik Uang (Cash)</h3>
+                    <div class="form-group">
+                        <label for="counted-cash">Masukkan Jumlah Uang Fisik</label>
+                        <input type="number" id="counted-cash" placeholder="0">
+                    </div>
+
+                    <div class="summary-row difference">
+                        <span>Selisih</span>
+                        <span id="close-difference" class="neutral">Rp 0</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="closing-notes">Catatan (Jika ada selisih)</label>
+                        <textarea id="closing-notes" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button id="cancel-closing-btn" class="btn secondary">Batal</button>
+                    <button id="confirm-closing-btn" class="btn primary">Tutup Shift & Logout</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Hidden area for printing -->
+    <div id="print-area" class="hidden"></div>
+
+    <script src="supabase-config.js"></script>
+    <script src="db.js"></script>
+    <script src="sync.js"></script>
+    <script src="print.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
