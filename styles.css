@@ -220,6 +220,16 @@ input:focus, select:focus, textarea:focus {
     border-radius: 0;
     border-left: none;
     border-right: none;
+    min-width: 80px;
+    font-size: 20px;
+    font-weight: 600;
+    padding: 8px 4px;
+    -moz-appearance: textfield; /* Firefox: sembunyikan spin */
+}
+.counter input::-webkit-outer-spin-button,
+.counter input::-webkit-inner-spin-button {
+    -webkit-appearance: none; /* Chrome/Safari: sembunyikan spin */
+    margin: 0;
 }
 .btn-count {
     background: var(--primary);

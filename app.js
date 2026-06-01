@@ -168,7 +168,7 @@ async function handleLogin(e) {
 
 // --- Transaction Form ---
 
-// Global function exposed to HTML for onclick events
+// Global function exposed to HTML for onclick events (tombol + dan -)
 window.updateCount = function (type, change) {
     const input = document.getElementById(`${type}-count`);
     let newVal = parseInt(input.value) + change;
@@ -179,6 +179,28 @@ window.updateCount = function (type, change) {
     input.value = newVal;
     state.order[type] = newVal;
 
+    updateOrderSummary();
+};
+
+// Handle direct keyboard input in counter fields
+window.handleCountInput = function (type) {
+    const input = document.getElementById(`${type}-count`);
+    let newVal = parseInt(input.value);
+
+    // Jika kosong atau NaN (sedang mengetik), biarkan sementara
+    if (isNaN(newVal) || input.value === '') {
+        state.order[type] = 0;
+        updateOrderSummary();
+        return;
+    }
+
+    // Pastikan tidak negatif
+    if (newVal < 0) {
+        newVal = 0;
+        input.value = 0;
+    }
+
+    state.order[type] = newVal;
     updateOrderSummary();
 };
 
