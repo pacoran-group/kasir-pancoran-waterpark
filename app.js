@@ -37,7 +37,8 @@ function uuidv4() {
 
 async function initApp() {
     // Bind Event Listeners FIRST so even if DB fails, form won't reload
-    document.getElementById('process-payment-btn').addEventListener('click', processPayment);
+    document.getElementById('submit-only-btn').addEventListener('click', () => processPayment(false));
+    document.getElementById('print-submit-btn').addEventListener('click', () => processPayment(true));
     document.getElementById('close-shift-btn').addEventListener('click', showClosingScreen);
     document.getElementById('cancel-closing-btn').addEventListener('click', hideClosingScreen);
     document.getElementById('confirm-closing-btn').addEventListener('click', submitClosingShift);
@@ -230,7 +231,11 @@ function resetTransactionForm() {
     updateOrderSummary();
 }
 
-async function processPayment() {
+/**
+ * processPayment - inti pemrosesan transaksi
+ * @param {boolean} withPrint - true = cetak tiket setelah simpan, false = simpan saja
+ */
+async function processPayment(withPrint) {
     const totalGuests = state.order.adult + state.order.child + state.order.free;
 
     if (totalGuests === 0) {
@@ -241,23 +246,26 @@ async function processPayment() {
     const adultTotal = state.order.adult * state.prices.adult;
     const childTotal = state.order.child * state.prices.child;
     const subtotal = adultTotal + childTotal;
-    const total = subtotal; // No discount implemented in MVP UI yet
+    const total = subtotal;
 
     const paymentMethod = document.querySelector('input[name="payment"]:checked').value;
     const visitorSource = document.getElementById('visitor-source').value;
 
-    const btn = document.getElementById('process-payment-btn');
-    btn.disabled = true;
-    btn.textContent = "Memproses...";
+    // Disable kedua tombol agar tidak double-submit
+    const btnSubmit = document.getElementById('submit-only-btn');
+    const btnPrint  = document.getElementById('print-submit-btn');
+    btnSubmit.disabled = true;
+    btnPrint.disabled  = true;
+    btnSubmit.textContent = withPrint ? 'Submit' : 'Menyimpan...';
+    btnPrint.textContent  = withPrint ? 'Mencetak...' : 'Print & Submit';
 
     try {
-        // 1. Create Order
+        // 1. Buat Order
         const orderId = uuidv4();
-        // Format order number PW-20260507-ORDERXXX
         const now = new Date();
         const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-        const timeStr = now.getHours().toString().padStart(2, '0') + 
-                        now.getMinutes().toString().padStart(2, '0') + 
+        const timeStr = now.getHours().toString().padStart(2, '0') +
+                        now.getMinutes().toString().padStart(2, '0') +
                         now.getSeconds().toString().padStart(2, '0');
         const orderCount = await db.orders.where('shift_id').equals(state.currentShift.id).count();
         const orderNum = `ORD-${dateStr}-${timeStr}-${String(orderCount + 1).padStart(3, '0')}`;
@@ -277,49 +285,98 @@ async function processPayment() {
             total_price: total,
             payment_method: paymentMethod,
             visitor_source: visitorSource,
-            is_synced: 0, // 0 = false for IndexedDB
+            is_synced: 0,
             created_at: new Date().toISOString()
         };
 
-        // 2. Generate Tickets
+        // 2. Generate Tiket
         const newTickets = [];
-        const createTicketData = (category, price) => {
-            return {
-                id: uuidv4(),
-                order_id: orderId,
-                ticket_code: generateTicketCode(),
-                category: category,
-                price: price,
-                status: 'sold',
-                created_at: new Date().toISOString()
-            };
-        };
+        const createTicketData = (category, price) => ({
+            id: uuidv4(),
+            order_id: orderId,
+            ticket_code: generateTicketCode(),
+            category: category,
+            price: price,
+            status: 'sold',
+            created_at: new Date().toISOString()
+        });
 
         for (let i = 0; i < state.order.adult; i++) newTickets.push(createTicketData('dewasa', state.prices.adult));
         for (let i = 0; i < state.order.child; i++) newTickets.push(createTicketData('anak', state.prices.child));
         for (let i = 0; i < state.order.free; i++) newTickets.push(createTicketData('gratis', 0));
 
-        // 3. Save to Local DB Transactionally
+        // 3. Simpan ke IndexedDB (local-first)
         await db.transaction('rw', db.orders, db.tickets, async () => {
             await db.orders.add(newOrder);
             await db.tickets.bulkAdd(newTickets);
         });
 
-        // 4. Print Tickets (this calls window.print internally)
-        await printTickets(newTickets, state.currentStaff.name);
+        // 4. Jika Print & Submit: kirim ke antrian cetak (print queue) di Supabase
+        //    PC printer akan polling dan auto-print dari antrian ini.
+        //    Jika offline, fallback ke print langsung dari browser ini.
+        if (withPrint) {
+            let queuedSuccessfully = false;
 
-        // 5. Success
+            if (navigator.onLine && window.supabaseInstance) {
+                try {
+                    // Sync order ke Supabase dulu (agar FK valid di print_queue)
+                    await window.supabaseInstance.from('orders').upsert([newOrder]);
+                    await window.supabaseInstance.from('tickets').upsert(newTickets);
+
+                    // Masukkan ke antrian cetak
+                    const { error: queueError } = await window.supabaseInstance
+                        .from('print_queue')
+                        .insert({
+                            id: uuidv4(),
+                            order_id: orderId,
+                            order_number: orderNum,
+                            cashier_name: state.currentStaff.name,
+                            tickets_json: newTickets,
+                            status: 'pending',
+                            created_at: new Date().toISOString()
+                        });
+
+                    if (!queueError) {
+                        queuedSuccessfully = true;
+                        // Tampilkan notifikasi antrian diterima
+                        showPrintQueueNotice(orderNum);
+                    } else {
+                        console.warn('Gagal kirim ke antrian, fallback print lokal:', queueError.message);
+                    }
+                } catch (syncErr) {
+                    console.warn('Sync error sebelum print queue, fallback lokal:', syncErr.message);
+                }
+            }
+
+            // Fallback: jika offline atau antrian gagal, print langsung dari browser ini
+            if (!queuedSuccessfully) {
+                await printTickets(newTickets, state.currentStaff.name);
+            }
+        }
+
+        // 5. Reset form & sinkronisasi background
         resetTransactionForm();
-
-        // Try background sync immediately
         if (typeof syncData === 'function') syncData();
+
+        if (!withPrint) {
+            // Berikan konfirmasi visual singkat
+            btnSubmit.textContent = '✓ Tersimpan!';
+            setTimeout(() => {
+                btnSubmit.textContent = '✓ Submit';
+            }, 1500);
+        }
+
 
     } catch (err) {
         console.error("Error processing payment:", err);
         alert("Gagal memproses transaksi: " + err.message);
     } finally {
-        btn.disabled = false;
-        btn.textContent = "Proses Pembayaran & Cetak QR";
+        btnSubmit.disabled = false;
+        btnPrint.disabled  = false;
+        if (withPrint) {
+            btnSubmit.innerHTML = '<span class="btn-icon">✓</span> Submit';
+            btnPrint.innerHTML  = '<span class="btn-icon">🖨</span> Print & Submit';
+        }
     }
 }
 
@@ -428,3 +485,58 @@ async function submitClosingShift() {
 window.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
+
+// --- Print Queue Notification ---
+
+/**
+ * Tampilkan notifikasi toast bahwa tiket berhasil masuk antrian cetak.
+ * PC printer yang sedang berjalan akan memprosesnya secara otomatis.
+ */
+function showPrintQueueNotice(orderNum) {
+    // Hapus toast lama jika ada
+    const existing = document.getElementById('print-queue-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'print-queue-toast';
+    toast.innerHTML = `
+        <span style="font-size:20px">🖨</span>
+        <div>
+            <strong>Antrian Cetak Dikirim</strong>
+            <div style="font-size:13px;opacity:0.9">${orderNum} — PC printer akan mencetak otomatis</div>
+        </div>
+    `;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1e293b;
+        color: white;
+        padding: 14px 20px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        z-index: 9999;
+        font-family: inherit;
+        min-width: 300px;
+        animation: slideUp 0.3s ease;
+    `;
+
+    // Tambahkan animasi
+    const style = document.createElement('style');
+    style.textContent = `@keyframes slideUp { from { transform: translateX(-50%) translateY(20px); opacity:0; } to { transform: translateX(-50%) translateY(0); opacity:1; } }`;
+    document.head.appendChild(style);
+
+    document.body.appendChild(toast);
+
+    // Auto-hilang setelah 4 detik
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+

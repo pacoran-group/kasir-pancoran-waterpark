@@ -86,6 +86,26 @@ CREATE TABLE IF NOT EXISTS tickets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 7. `print_queue` — Antrian cetak tiket dari tablet kasir
+-- Status: 'pending' (menunggu), 'printing' (sedang dicetak), 'done' (selesai), 'error'
+CREATE TABLE IF NOT EXISTS print_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  order_number VARCHAR NOT NULL,
+  cashier_name VARCHAR NOT NULL,
+  tickets_json JSONB NOT NULL,    -- Array tiket dalam format JSON
+  status VARCHAR DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  printed_at TIMESTAMPTZ
+);
+
+-- Index agar PC printer bisa query antrian pending dengan cepat
+CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status, created_at ASC);
+
+-- RLS: izinkan anon insert dan update (kasir & print server sama-sama pakai anon key)
+ALTER TABLE print_queue ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all on print_queue" ON print_queue FOR ALL USING (true) WITH CHECK (true);
+
 -- Insert dummy data for initialization (Optional but recommended for testing)
 -- INSERT INTO units (id, name, code) VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Pancoran Waterpark', 'PW');
 -- INSERT INTO staff (unit_id, name, pin, role) VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Kasir 1', '1234', 'cashier');

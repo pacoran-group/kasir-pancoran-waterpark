@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Server — Pancoran Waterpark</title>
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* ===== BASE ===== */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --primary: #0284c7;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface2: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header-logo {
+            height: 44px;
+            object-fit: contain;
+        }
+        .header-title h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .header-title p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ===== STATUS BAR ===== */
+        .status-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .status-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .status-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .dot-online  { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .dot-offline { background: var(--danger);  box-shadow: 0 0 8px var(--danger);  }
+        .dot-idle    { background: var(--text-muted); }
+        .dot-printing{ background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { opacity: 0.5; } }
+
+        .status-label { font-size: 13px; color: var(--text-muted); }
+        .status-value { font-size: 16px; font-weight: 600; }
+
+        /* ===== CONTROLS ===== */
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #0369a1; }
+        .btn-danger  { background: var(--danger); color: white; }
+        .btn-danger:hover  { background: #dc2626; }
+        .btn-ghost   { background: var(--surface2); color: var(--text); }
+        .btn-ghost:hover   { background: #475569; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .poll-interval-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+        .poll-interval-label select {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 13px;
+            font-family: inherit;
+            margin-left: 8px;
+            cursor: pointer;
+        }
+
+        /* ===== QUEUE LOG ===== */
+        .section-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+        .queue-log {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .queue-empty {
+            padding: 48px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        .queue-empty .empty-icon { font-size: 48px; margin-bottom: 12px; }
+        .queue-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+        }
+        .queue-item:last-child { border-bottom: none; }
+        .queue-item.status-pending  { border-left: 3px solid var(--warning); }
+        .queue-item.status-printing { border-left: 3px solid var(--primary); background: rgba(2,132,199,0.05); }
+        .queue-item.status-done     { border-left: 3px solid var(--success); opacity: 0.6; }
+        .queue-item.status-error    { border-left: 3px solid var(--danger); }
+
+        .queue-badge {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        .badge-pending  { background: rgba(245,158,11,0.15);  color: var(--warning); }
+        .badge-printing { background: rgba(2,132,199,0.15);   color: var(--primary); }
+        .badge-done     { background: rgba(16,185,129,0.15);  color: var(--success); }
+        .badge-error    { background: rgba(239,68,68,0.15);   color: var(--danger);  }
+
+        .queue-info { flex: 1; }
+        .queue-order-num { font-weight: 600; font-size: 15px; }
+        .queue-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+        .queue-action .btn { padding: 6px 14px; font-size: 12px; }
+
+        /* ===== STATS ===== */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-num {
+            font-size: 36px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+        .stat-num.pending  { color: var(--warning); }
+        .stat-num.printed  { color: var(--success); }
+        .stat-num.errors   { color: var(--danger);  }
+        .stat-label { font-size: 13px; color: var(--text-muted); }
+
+        /* ===== PRINT AREA (hidden, only visible during print) ===== */
+        #print-area { display: none; }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            body > *:not(#print-area) { display: none !important; }
+            #print-area {
+                display: block !important;
+                margin: 0; padding: 0;
+                background: white;
+            }
+
+            .ticket-label {
+                width: 50mm;
+                height: 15mm;
+                box-sizing: border-box;
+                page-break-after: always;
+                font-family: 'Inter', Arial, sans-serif;
+                color: #000;
+                overflow: hidden;
+                padding: 0.5mm 1.5mm;
+                display: block;
+                background: white;
+            }
+
+            @page { size: 50mm 15mm; margin: 0; }
+
+            .ticket-content {
+                display: flex;
+                flex-direction: row;
+                width: 100%;
+                height: 100%;
+                align-items: center;
+                justify-content: flex-start;
+            }
+            .qr-wrapper {
+                flex: 0 0 12mm;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            .qr-container img, .qr-container canvas {
+                width: 12mm; height: 12mm; display: block;
+            }
+            .ticket-details {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding-left: 3mm;
+                height: 100%;
+                overflow: hidden;
+            }
+            .ticket-details h1 { font-size: 5.5px; margin: 0; font-weight: 800; line-height: 1.2; letter-spacing: 0.1px; }
+            .ticket-details h2 { font-size: 5px; margin: 0 0 0.3mm 0; font-weight: 600; line-height: 1.1; }
+            .ticket-type  { font-size: 8.5px; font-weight: 900; margin: 0.2mm 0; line-height: 1; }
+            .ticket-price { font-size: 6.5px; margin: 0.2mm 0 0.5mm 0; line-height: 1; font-weight: 600; }
+            .ticket-footer {
+                font-size: 3.5px;
+                line-height: 1;
+                color: #000;
+                margin-top: 0.5mm;
+                display: flex;
+                gap: 4px;
+                opacity: 0.8;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <img src="Logo%20Pancoran%20Waterpark.webp" alt="Pancoran Waterpark" class="header-logo">
+            <div class="header-title">
+                <h1>🖨 Print Server</h1>
+                <p>Pancoran Waterpark — PC Printer (Biarkan halaman ini terbuka)</p>
+            </div>
+        </div>
+        <img src="Logo%20Pancoran%20Group.webp" alt="Pancoran Group" class="header-logo">
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-card">
+            <div class="status-dot" id="conn-dot"></div>
+            <div>
+                <div class="status-label">Koneksi</div>
+                <div class="status-value" id="conn-status">Menghubungkan...</div>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-dot" id="poll-dot"></div>
+            <div>
+                <div class="status-label">Status Polling</div>
+                <div class="status-value" id="poll-status">Belum dimulai</div>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-dot dot-idle"></div>
+            <div>
+                <div class="status-label">Polling berikutnya</div>
+                <div class="status-value" id="next-poll">—</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-num pending" id="stat-pending">0</div>
+            <div class="stat-label">⏳ Antrian Pending</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num printed" id="stat-printed">0</div>
+            <div class="stat-label">✅ Dicetak Hari Ini</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num errors" id="stat-errors">0</div>
+            <div class="stat-label">❌ Error</div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="btn btn-primary" id="start-btn" onclick="startPolling()">▶ Mulai Polling</button>
+        <button class="btn btn-danger" id="stop-btn" onclick="stopPolling()" disabled>⏹ Stop</button>
+        <button class="btn btn-ghost" onclick="fetchAndRender()">🔄 Refresh Sekarang</button>
+        <label class="poll-interval-label">
+            Interval:
+            <select id="poll-interval" onchange="changeInterval()">
+                <option value="3000">3 detik</option>
+                <option value="5000" selected>5 detik</option>
+                <option value="10000">10 detik</option>
+                <option value="15000">15 detik</option>
+            </select>
+        </label>
+    </div>
+
+    <!-- Queue Log -->
+    <div class="section-title">Log Antrian Cetak</div>
+    <div class="queue-log" id="queue-log">
+        <div class="queue-empty">
+            <div class="empty-icon">🖨</div>
+            <div>Belum ada antrian. Mulai polling untuk memeriksa.</div>
+        </div>
+    </div>
+
+    <!-- Hidden print area -->
+    <div id="print-area"></div>
+
+    <script src="supabase-config.js"></script>
+    <script>
+    // ============================================================
+    //  PRINT SERVER — Pancoran Waterpark
+    //  Halaman ini berjalan di PC yang terhubung ke printer.
+    //  Polling Supabase setiap N detik, auto-print tiket pending.
+    // ============================================================
+
+    let pollingTimer   = null;
+    let countdownTimer = null;
+    let remainingMs    = 0;
+    let statsToday     = { pending: 0, printed: 0, errors: 0 };
+    let isProcessing   = false;  // Kunci: cegah proses paralel
+
+    // ── Init ────────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+        updateConnectionStatus();
+        window.addEventListener('online',  updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+        fetchAndRender(); // Muat antrian pertama kali
+    });
+
+    function updateConnectionStatus() {
+        const dot    = document.getElementById('conn-dot');
+        const status = document.getElementById('conn-status');
+        if (navigator.onLine) {
+            dot.className    = 'status-dot dot-online';
+            status.textContent = 'Online';
+        } else {
+            dot.className    = 'status-dot dot-offline';
+            status.textContent = 'Offline';
+        }
+    }
+
+    // ── Polling Control ─────────────────────────────────────────
+    function startPolling() {
+        document.getElementById('start-btn').disabled = true;
+        document.getElementById('stop-btn').disabled  = false;
+        document.getElementById('poll-dot').className = 'status-dot dot-online';
+        document.getElementById('poll-status').textContent = 'Aktif';
+        scheduleNextPoll();
+    }
+
+    function stopPolling() {
+        clearTimeout(pollingTimer);
+        clearInterval(countdownTimer);
+        pollingTimer = null;
+        document.getElementById('start-btn').disabled = false;
+        document.getElementById('stop-btn').disabled  = true;
+        document.getElementById('poll-dot').className = 'status-dot dot-idle';
+        document.getElementById('poll-status').textContent = 'Berhenti';
+        document.getElementById('next-poll').textContent = '—';
+    }
+
+    function changeInterval() {
+        if (pollingTimer !== null) {
+            stopPolling();
+            startPolling();
+        }
+    }
+
+    function scheduleNextPoll() {
+        const interval = parseInt(document.getElementById('poll-interval').value);
+        remainingMs = interval;
+
+        clearInterval(countdownTimer);
+        countdownTimer = setInterval(() => {
+            remainingMs -= 1000;
+            if (remainingMs <= 0) remainingMs = 0;
+            document.getElementById('next-poll').textContent = (remainingMs / 1000).toFixed(0) + 's';
+        }, 1000);
+
+        pollingTimer = setTimeout(async () => {
+            clearInterval(countdownTimer);
+            await fetchAndProcess();
+            scheduleNextPoll(); // Loop
+        }, interval);
+    }
+
+    // ── Fetch & Render (tampilan saja, tanpa print) ─────────────
+    async function fetchAndRender() {
+        if (!window.supabaseInstance) return;
+
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const { data, error } = await window.supabaseInstance
+            .from('print_queue')
+            .select('*')
+            .gte('created_at', today + 'T00:00:00')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) { console.error('Fetch error:', error); return; }
+
+        renderQueue(data || []);
+        updateStats(data || []);
+    }
+
+    // ── Fetch & Process (polling aktif: cari pending, lalu print) ─
+    async function fetchAndProcess() {
+        if (!navigator.onLine || !window.supabaseInstance) return;
+        if (isProcessing) return; // Jangan proses paralel
+
+        isProcessing = true;
+        document.getElementById('poll-dot').className  = 'status-dot dot-printing';
+        document.getElementById('poll-status').textContent = 'Memeriksa...';
+
+        try {
+            // Ambil HANYA item pending, urut dari yang paling lama (FIFO)
+            const { data: pendingItems, error } = await window.supabaseInstance
+                .from('print_queue')
+                .select('*')
+                .eq('status', 'pending')
+                .order('created_at', { ascending: true })
+                .limit(10); // Proses maksimal 10 sekaligus
+
+            if (error) throw error;
+
+            if (pendingItems && pendingItems.length > 0) {
+                for (const item of pendingItems) {
+                    await processQueueItem(item);
+                }
+            }
+
+            // Refresh tampilan
+            await fetchAndRender();
+
+        } catch (err) {
+            console.error('Process error:', err);
+        } finally {
+            isProcessing = false;
+            document.getElementById('poll-dot').className  = 'status-dot dot-online';
+            document.getElementById('poll-status').textContent = 'Aktif';
+        }
+    }
+
+    // ── Proses 1 item antrian ────────────────────────────────────
+    async function processQueueItem(item) {
+        // 1. Klaim item: ubah status ke 'printing' (optimistic lock)
+        //    Hanya row dengan status 'pending' yang akan diubah.
+        //    Jika ada PC lain yang sudah klaim, update ini akan mengubah 0 baris.
+        const { data: claimed, error: claimErr } = await window.supabaseInstance
+            .from('print_queue')
+            .update({ status: 'printing' })
+            .eq('id', item.id)
+            .eq('status', 'pending')  // ← kunci: hanya jika masih 'pending'
+            .select();
+
+        if (claimErr || !claimed || claimed.length === 0) {
+            // Item sudah diklaim oleh instance lain atau sudah berubah status
+            console.log(`Item ${item.id} sudah diklaim, skip.`);
+            return;
+        }
+
+        try {
+            // 2. Print tiket
+            const tickets = Array.isArray(item.tickets_json) ? item.tickets_json : JSON.parse(item.tickets_json);
+            await doPrint(tickets, item.cashier_name, item.order_number);
+
+            // 3. Tandai selesai
+            await window.supabaseInstance
+                .from('print_queue')
+                .update({ status: 'done', printed_at: new Date().toISOString() })
+                .eq('id', item.id);
+
+            statsToday.printed++;
+
+        } catch (printErr) {
+            console.error('Print error for item', item.id, printErr);
+            // Tandai error agar tidak diulang terus
+            await window.supabaseInstance
+                .from('print_queue')
+                .update({ status: 'error' })
+                .eq('id', item.id);
+            statsToday.errors++;
+        }
+    }
+
+    // ── Cetak tiket (sama dengan logic di print.js tablet) ──────
+    async function doPrint(tickets, cashierName, orderNum) {
+        const printArea = document.getElementById('print-area');
+        printArea.innerHTML = '';
+
+        for (const ticket of tickets) {
+            const label = document.createElement('div');
+            label.className = 'ticket-label';
+
+            const dateStr = new Date(ticket.created_at).toLocaleString('id-ID', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            });
+
+            label.innerHTML = `
+                <div class="ticket-content">
+                    <div class="qr-wrapper">
+                        <div class="qr-container"></div>
+                    </div>
+                    <div class="ticket-details">
+                        <h1>PANCORAN</h1>
+                        <h2>WATERPARK</h2>
+                        <div class="ticket-type">${ticket.category.toUpperCase()}</div>
+                        <div class="ticket-price">Rp ${Number(ticket.price).toLocaleString('id-ID')}</div>
+                        <div class="ticket-footer">
+                            <div>ID: ${ticket.ticket_code}</div>
+                            <div>${dateStr}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            printArea.appendChild(label);
+
+            // Generate QR
+            const qrContainer = label.querySelector('.qr-container');
+            new QRCode(qrContainer, {
+                text: ticket.ticket_code,
+                width: 40, height: 40,
+                colorDark: '#000000', colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+
+        // Tunggu QR render lalu print
+        return new Promise(resolve => {
+            setTimeout(() => {
+                window.print();
+                // Bersihkan setelah print
+                setTimeout(() => {
+                    printArea.innerHTML = '';
+                    resolve();
+                }, 1000);
+            }, 600);
+        });
+    }
+
+    // ── Render Queue Log ─────────────────────────────────────────
+    function renderQueue(items) {
+        const log = document.getElementById('queue-log');
+        if (items.length === 0) {
+            log.innerHTML = `
+                <div class="queue-empty">
+                    <div class="empty-icon">✅</div>
+                    <div>Tidak ada antrian hari ini.</div>
+                </div>`;
+            return;
+        }
+
+        const badgeMap = {
+            pending:  '<span class="queue-badge badge-pending">⏳ Pending</span>',
+            printing: '<span class="queue-badge badge-printing">🖨 Mencetak</span>',
+            done:     '<span class="queue-badge badge-done">✅ Selesai</span>',
+            error:    '<span class="queue-badge badge-error">❌ Error</span>',
+        };
+
+        log.innerHTML = items.map(item => {
+            const time = new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const tickets = Array.isArray(item.tickets_json) ? item.tickets_json : JSON.parse(item.tickets_json);
+            const badge  = badgeMap[item.status] || badgeMap.error;
+
+            const retryBtn = (item.status === 'error')
+                ? `<button class="btn btn-ghost queue-action" onclick="retryItem('${item.id}')">↩ Coba Lagi</button>`
+                : '';
+
+            return `
+                <div class="queue-item status-${item.status}">
+                    ${badge}
+                    <div class="queue-info">
+                        <div class="queue-order-num">${item.order_number}</div>
+                        <div class="queue-meta">
+                            Kasir: ${item.cashier_name} &nbsp;·&nbsp;
+                            ${tickets.length} tiket &nbsp;·&nbsp;
+                            ${time}
+                            ${item.printed_at ? ' &nbsp;·&nbsp; Dicetak: ' + new Date(item.printed_at).toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'}) : ''}
+                        </div>
+                    </div>
+                    <div class="queue-action">${retryBtn}</div>
+                </div>`;
+        }).join('');
+    }
+
+    function updateStats(items) {
+        const today = new Date().toISOString().slice(0, 10);
+        const todayItems = items.filter(i => i.created_at.startsWith(today));
+        document.getElementById('stat-pending').textContent = todayItems.filter(i => i.status === 'pending').length;
+        document.getElementById('stat-printed').textContent = todayItems.filter(i => i.status === 'done').length;
+        document.getElementById('stat-errors').textContent  = todayItems.filter(i => i.status === 'error').length;
+    }
+
+    // ── Retry item yang error ────────────────────────────────────
+    async function retryItem(id) {
+        if (!window.supabaseInstance) return;
+        await window.supabaseInstance
+            .from('print_queue')
+            .update({ status: 'pending' })
+            .eq('id', id);
+        await fetchAndProcess();
+    }
+    </script>
+</body>
+</html>

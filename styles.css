@@ -164,6 +164,31 @@ input:focus, select:focus, textarea:focus {
     padding: 16px 24px;
     font-size: 18px;
 }
+.btn.success {
+    background-color: var(--success);
+    color: white;
+}
+.btn.success:hover { background-color: #059669; }
+
+/* --- Action Buttons (Submit + Print row) --- */
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+.action-buttons .btn {
+    flex: 1;
+    font-size: 15px;
+    padding: 14px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.btn-icon {
+    font-size: 18px;
+    line-height: 1;
+}
 
 /* --- Cashier Dashboard --- */
 #cashier-screen header {

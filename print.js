@@ -8,13 +8,13 @@
 function generateTicketCode() {
     const prefix = 'PW';
     const date = new Date();
-    const dateStr = date.getFullYear() + 
-        String(date.getMonth() + 1).padStart(2, '0') + 
+    const dateStr = date.getFullYear() +
+        String(date.getMonth() + 1).padStart(2, '0') +
         String(date.getDate()).padStart(2, '0');
-    
+
     // Generate random 4 character alphanumeric
     const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-    
+
     return `${prefix}-${dateStr}-${randomStr}`;
 }
 
@@ -29,7 +29,7 @@ async function printTickets(tickets, cashierName) {
 
     for (let i = 0; i < tickets.length; i++) {
         const ticket = tickets[i];
-        
+
         // Create ticket label container
         const label = document.createElement('div');
         label.className = 'ticket-label';
@@ -65,9 +65,9 @@ async function printTickets(tickets, cashierName) {
             text: ticket.ticket_code,
             width: 40,
             height: 40,
-            colorDark : "#000000",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.M
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
         });
     }
 
