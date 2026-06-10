@@ -143,3 +143,9 @@ async function syncData() {
 updateOnlineStatus();
 // Run sync periodically (every 1 minute)
 setInterval(syncData, 60000);
+// Refresh bookings every 5 minutes (agar data reservasi selalu fresh)
+setInterval(async () => {
+    if (typeof syncBookingsFromSupabase === 'function') {
+        await syncBookingsFromSupabase();
+    }
+}, 5 * 60 * 1000);

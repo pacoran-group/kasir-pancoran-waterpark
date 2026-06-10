@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Kasir - Pancoran Waterpark</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <!-- Dexie.js for IndexedDB -->
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
@@ -16,173 +19,328 @@
 
 <body>
     <div id="app">
-        <!-- Loader / Sync Indicator -->
+        <!-- Sync Status (fixed bottom-left) -->
         <div id="sync-status" class="sync-status">
             <span class="indicator online"></span> Online
         </div>
 
-        <!-- 1. LOGIN SCREEN -->
+        <!-- ===================== 1. LOGIN SCREEN ===================== -->
         <section id="login-screen" class="screen active">
-            <div class="login-container">
-                <div class="login-logos">
-                    <img src="Logo%20Pancoran%20Waterpark.webp" alt="Pancoran Waterpark" class="logo-unit">
-                    <img src="Logo%20Pancoran%20Group.webp" alt="Pancoran Group" class="logo-holdings">
+            <div class="login-bg">
+                <div class="login-card">
+                    <div class="login-logos">
+                        <img src="Logo%20Pancoran%20Waterpark.webp" alt="Pancoran Waterpark" class="logo-unit">
+                        <img src="Logo%20Pancoran%20Group.webp" alt="Pancoran Group" class="logo-holdings">
+                    </div>
+                    <h1 class="login-title">Pancoran Waterpark</h1>
+                    <p class="login-subtitle">Sistem Kasir</p>
+                    <form id="login-form" onsubmit="return false;">
+                        <div class="form-group">
+                            <label for="cashier-select">Pilih Kasir</label>
+                            <select id="cashier-select">
+                                <option value="">-- Pilih Nama --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="pin-input">PIN</label>
+                            <input type="password" id="pin-input" placeholder="Masukkan PIN 4-6 digit" maxlength="6"
+                                onkeydown="if(event.key === 'Enter') handleLogin(event)">
+                        </div>
+                        <button type="button" id="login-btn" class="btn primary" onclick="handleLogin(event)">
+                            Login / Buka Shift
+                        </button>
+                    </form>
                 </div>
-                <h2>Pancoran Waterpark</h2>
-                <h3>Sistem Kasir</h3>
-                <form id="login-form" onsubmit="return false;">
-                    <div class="form-group">
-                        <label for="cashier-select">Pilih Kasir</label>
-                        <select id="cashier-select">
-                            <option value="">-- Pilih Nama --</option>
-                            <!-- Options will be populated from DB -->
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="pin-input">PIN</label>
-                        <input type="password" id="pin-input" placeholder="Masukkan PIN 4-6 digit" maxlength="6" onkeydown="if(event.key === 'Enter') handleLogin(event)">
-                    </div>
-                    <button type="button" id="login-btn" class="btn primary" onclick="handleLogin(event)">Login / Buka Shift</button>
-                </form>
             </div>
         </section>
 
-        <!-- 2. CASHIER DASHBOARD -->
+        <!-- ===================== 2. CASHIER DASHBOARD ===================== -->
         <section id="cashier-screen" class="screen">
-            <header>
-                <div class="header-left">
+            <!-- Top Header Bar -->
+            <header class="top-header">
+                <div class="header-brand">
                     <img src="Logo%20Pancoran%20Waterpark.webp" alt="Pancoran Waterpark" class="header-logo">
-                    <div>
-                        <h2>Pancoran Waterpark</h2>
-                        <p>Shift: <span id="current-shift-time"></span> | Kasir: <span id="current-cashier-name"></span></p>
-                    </div>
+                    <span class="header-title">SplashPoint POS</span>
                 </div>
-                <div class="header-right">
-                    <img src="Logo%20Pancoran%20Group.webp" alt="Pancoran Group" class="header-logo">
-                    <button id="close-shift-btn" class="btn danger">Closing Shift</button>
+                <div class="header-meta">
+                    <span id="header-terminal" class="terminal-badge">Terminal #01</span>
+                    <button id="close-shift-btn" class="btn-closing">Closing Shift</button>
                 </div>
             </header>
 
-            <div class="dashboard-content">
-                <!-- Left Panel: Transaction Form -->
-                <div class="panel transaction-form">
-                    <h3>Transaksi Baru</h3>
-
-                    <div class="form-group">
-                        <label>Dewasa (Rp 28.000)</label>
-                        <div class="counter">
-                            <button class="btn-count" onclick="updateCount('adult', -1)">-</button>
-                            <input type="number" id="adult-count" value="1" min="0" oninput="handleCountInput('adult')" onchange="handleCountInput('adult')">
-                            <button class="btn-count" onclick="updateCount('adult', 1)">+</button>
+            <div class="cashier-layout">
+                <!-- ---- SIDEBAR ---- -->
+                <aside class="sidebar">
+                    <div class="sidebar-profile">
+                        <div class="avatar-circle">
+                            <span id="avatar-initials">K</span>
+                        </div>
+                        <div class="sidebar-profile-info">
+                            <div id="sidebar-cashier-name" class="profile-name">Kasir</div>
+                            <div class="profile-status">
+                                <span class="dot-active"></span> Active Session
+                            </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Anak < 5 thn (Rp 10.000)</label>
-                                <div class="counter">
-                                    <button class="btn-count" onclick="updateCount('child', -1)">-</button>
-                                    <input type="number" id="child-count" value="0" min="0" oninput="handleCountInput('child')" onchange="handleCountInput('child')">
-                                    <button class="btn-count" onclick="updateCount('child', 1)">+</button>
+                    <nav class="sidebar-nav">
+                        <button class="nav-item active" id="nav-sales" onclick="switchTab('sales')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                <path d="M8 21h8M12 17v4"/>
+                            </svg>
+                            Sales
+                        </button>
+                        <button class="nav-item" id="nav-history" onclick="switchTab('history')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            History
+                        </button>
+                        <button class="nav-item" id="nav-booking" onclick="switchTab('booking')">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+                            </svg>
+                            Reservasi
+                        </button>
+                    </nav>
+
+                    <div class="sidebar-footer">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        Quick Support
+                    </div>
+                </aside>
+
+                <!-- ---- MAIN CONTENT ---- -->
+                <main class="main-content">
+
+                    <!-- === TAB: SALES === -->
+                    <div id="tab-sales" class="tab-content active">
+                        <div class="content-header">
+                            <div class="tab-pills">
+                                <button class="tab-pill active" id="pill-tiket">Tiket Masuk</button>
+                            </div>
+                        </div>
+
+                        <div class="sales-panel">
+                            <h3 class="panel-title">Order Details</h3>
+                            <div class="order-form-grid">
+                                <!-- Dewasa -->
+                                <div class="order-field">
+                                    <label class="field-label">Jumlah Pengunjung Dewasa</label>
+                                    <div class="counter">
+                                        <button class="btn-count" onclick="updateCount('adult', -1)">−</button>
+                                        <input type="number" id="adult-count" value="1" min="0"
+                                            oninput="handleCountInput('adult')" onchange="handleCountInput('adult')">
+                                        <button class="btn-count" onclick="updateCount('adult', 1)">+</button>
+                                    </div>
                                 </div>
-                    </div>
 
-                    <div class="form-group">
-                        <label>Gratis / VIP (Rp 0)</label>
-                        <div class="counter">
-                            <button class="btn-count" onclick="updateCount('free', -1)">-</button>
-                            <input type="number" id="free-count" value="0" min="0" oninput="handleCountInput('free')" onchange="handleCountInput('free')">
-                            <button class="btn-count" onclick="updateCount('free', 1)">+</button>
+                                <!-- Promo / Harga info -->
+                                <div class="order-field">
+                                    <label class="field-label">Harga Berlaku</label>
+                                    <div id="price-badge" class="price-badge regular">
+                                        <span id="price-badge-label">Reguler</span>
+                                        <span id="price-badge-value">Rp 28.000 / orang</span>
+                                    </div>
+                                    <p id="rombongan-hint" class="rombongan-hint hidden">
+                                        🎉 Harga Sekolah aktif (min. 30 pax) — Rp 20.000/org
+                                    </p>
+                                    <p id="rombongan-umum-hint" class="rombongan-umum-hint hidden">
+                                        ℹ️ Rombongan umum: harga reguler Rp 28.000/org
+                                    </p>
+                                </div>
+
+                                <!-- Anak -->
+                                <div class="order-field">
+                                    <label class="field-label">Anak &lt; 5 thn <span class="price-tag">Rp 10.000</span></label>
+                                    <div class="counter">
+                                        <button class="btn-count" onclick="updateCount('child', -1)">−</button>
+                                        <input type="number" id="child-count" value="0" min="0"
+                                            oninput="handleCountInput('child')" onchange="handleCountInput('child')">
+                                        <button class="btn-count" onclick="updateCount('child', 1)">+</button>
+                                    </div>
+                                </div>
+
+                                <!-- Gratis / VIP -->
+                                <div class="order-field">
+                                    <label class="field-label">Gratis / VIP <span class="price-tag free">Rp 0</span></label>
+                                    <div class="counter">
+                                        <button class="btn-count" onclick="updateCount('free', -1)">−</button>
+                                        <input type="number" id="free-count" value="0" min="0"
+                                            oninput="handleCountInput('free')" onchange="handleCountInput('free')">
+                                        <button class="btn-count" onclick="updateCount('free', 1)">+</button>
+                                    </div>
+                                </div>
+
+                                <!-- Sumber Pengunjung -->
+                                <div class="order-field">
+                                    <label class="field-label" for="visitor-source">Sumber Pengunjung</label>
+                                    <select id="visitor-source" onchange="handleSourceChange()">
+                                        <option value="walk-in">Walk in</option>
+                                        <option value="rombongan-sekolah">Rombongan Sekolah 🏫</option>
+                                        <option value="rombongan-umum">Rombongan Umum</option>
+                                        <option value="travel-agent">Travel Agent</option>
+                                    </select>
+                                </div>
+
+                                <!-- Metode Pembayaran -->
+                                <div class="order-field">
+                                    <label class="field-label">Metode Pembayaran</label>
+                                    <div class="payment-methods">
+                                        <label class="pay-opt">
+                                            <input type="radio" name="payment" value="cash" checked>
+                                            <span>Cash</span>
+                                        </label>
+                                        <label class="pay-opt">
+                                            <input type="radio" name="payment" value="qris">
+                                            <span>QRIS</span>
+                                        </label>
+                                        <label class="pay-opt">
+                                            <input type="radio" name="payment" value="transfer">
+                                            <span>Transfer</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Booking reference badge (shown when booking is loaded) -->
+                            <div id="booking-ref-badge" class="booking-ref-badge hidden">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+                                </svg>
+                                <span id="booking-ref-text">Reservasi: —</span>
+                                <button class="clear-booking-btn" onclick="clearBookingRef()" title="Hapus referensi booking">✕</button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="visitor-source">Sumber Pengunjung</label>
-                        <select id="visitor-source">
-                            <option value="walk-in">Walk-in</option>
-                            <option value="rombongan">Rombongan</option>
-                            <option value="travel-agent">Travel Agent</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="payment-method">Metode Pembayaran</label>
-                        <div class="payment-methods">
-                            <label><input type="radio" name="payment" value="cash" checked> Cash</label>
-                            <label><input type="radio" name="payment" value="qris"> QRIS</label>
-                            <label><input type="radio" name="payment" value="transfer"> Transfer</label>
+                    <!-- === TAB: HISTORY === -->
+                    <div id="tab-history" class="tab-content">
+                        <div class="content-header">
+                            <h3 class="panel-title">Riwayat Transaksi Hari Ini</h3>
+                            <button class="btn-refresh" onclick="loadTodayHistory()">↻ Refresh</button>
+                        </div>
+                        <div id="history-list" class="history-list">
+                            <div class="empty-state">
+                                <div class="empty-icon">📋</div>
+                                <p>Belum ada transaksi hari ini</p>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Right Panel: Order Summary -->
-                <div class="panel order-summary">
-                    <h3>Ringkasan Transaksi</h3>
-                    <div class="summary-details">
+                    <!-- === TAB: BOOKING === -->
+                    <div id="tab-booking" class="tab-content">
+                        <div class="content-header">
+                            <h3 class="panel-title">Reservasi Hari Ini</h3>
+                            <button class="btn-refresh" onclick="loadTodayBookings()">↻ Refresh</button>
+                        </div>
+                        <div id="booking-list" class="booking-list">
+                            <div class="empty-state">
+                                <div class="empty-icon">📅</div>
+                                <p>Tidak ada reservasi hari ini</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </main>
+
+                <!-- ---- RIGHT PANEL: RINGKASAN ---- -->
+                <aside class="summary-panel">
+                    <h3 class="summary-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <rect x="5" y="2" width="14" height="20" rx="2"/>
+                            <line x1="9" y1="7" x2="15" y2="7"/>
+                            <line x1="9" y1="12" x2="15" y2="12"/>
+                            <line x1="9" y1="17" x2="13" y2="17"/>
+                        </svg>
+                        Ringkasan Transaksi
+                    </h3>
+
+                    <div class="summary-body">
                         <div class="summary-row">
                             <span>Total Pengunjung</span>
-                            <span id="summary-guests">1 Orang</span>
+                            <span id="summary-guests" class="summary-val">1 Orang</span>
                         </div>
-                        <hr>
+                        <div class="summary-row sub">
+                            <span id="summary-adult-label">Dewasa (×1)</span>
+                            <span id="summary-adult-val">Rp 28.000</span>
+                        </div>
+                        <div class="summary-row sub" id="summary-child-row">
+                            <span id="summary-child-label">Anak (×0)</span>
+                            <span id="summary-child-val">Rp 0</span>
+                        </div>
+                        <div class="summary-divider"></div>
                         <div class="summary-row">
-                            <span>Subtotal</span>
+                            <span>Sub Total</span>
                             <span id="summary-subtotal">Rp 28.000</span>
                         </div>
-                        <div class="summary-row">
-                            <span>Diskon/Promo</span>
-                            <span id="summary-discount">Rp 0</span>
+                        <div class="summary-row promo-row">
+                            <span>Promo/Diskon</span>
+                            <span id="summary-discount" class="promo-val">- Rp 0</span>
                         </div>
-                        <hr>
-                        <div class="summary-row total">
-                            <span>Total Bayar</span>
-                            <span id="summary-total">Rp 28.000</span>
+                        <div class="summary-divider dashed"></div>
+                        <div class="summary-total-row">
+                            <span class="total-label">TOTAL BAYAR</span>
+                            <span id="summary-total" class="total-value">Rp 28.000</span>
                         </div>
                     </div>
 
                     <div class="action-buttons">
-                        <button id="submit-only-btn" class="btn success large">
-                            <span class="btn-icon">✓</span> Submit
+                        <button id="submit-only-btn" class="btn-action outline">
+                            Submit
                         </button>
-                        <button id="print-submit-btn" class="btn primary large">
-                            <span class="btn-icon">🖨</span> Print &amp; Submit
+                        <button id="print-submit-btn" class="btn-action solid">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <polyline points="6 9 6 2 18 2 18 9"/>
+                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                <rect x="6" y="14" width="12" height="8"/>
+                            </svg>
+                            Submit &amp; Print
                         </button>
                     </div>
-                </div>
+                </aside>
             </div>
         </section>
 
-        <!-- 3. CLOSING SHIFT SCREEN -->
+        <!-- ===================== 3. CLOSING SHIFT SCREEN ===================== -->
         <section id="closing-screen" class="screen">
-            <div class="closing-container">
-                <h2>Closing Shift</h2>
-                <div class="closing-summary">
-                    <h3>Rekap Penjualan (Sistem)</h3>
-                    <div class="summary-row"><span>Total Transaksi</span> <span id="close-total-orders">0</span></div>
-                    <div class="summary-row"><span>Cash</span> <span id="close-system-cash">Rp 0</span></div>
-                    <div class="summary-row"><span>QRIS</span> <span id="close-system-qris">Rp 0</span></div>
-                    <div class="summary-row"><span>Transfer</span> <span id="close-system-transfer">Rp 0</span></div>
-                </div>
-
-                <div class="closing-form">
-                    <h3>Hitung Fisik Uang (Cash)</h3>
-                    <div class="form-group">
-                        <label for="counted-cash">Masukkan Jumlah Uang Fisik</label>
-                        <input type="number" id="counted-cash" placeholder="0">
+            <div class="closing-wrapper">
+                <div class="closing-card">
+                    <h2 class="closing-title">Closing Shift</h2>
+                    <div class="closing-summary">
+                        <h4>Rekap Penjualan (Sistem)</h4>
+                        <div class="summary-row"><span>Total Transaksi</span> <span id="close-total-orders">0</span></div>
+                        <div class="summary-row"><span>Cash</span> <span id="close-system-cash">Rp 0</span></div>
+                        <div class="summary-row"><span>QRIS</span> <span id="close-system-qris">Rp 0</span></div>
+                        <div class="summary-row"><span>Transfer</span> <span id="close-system-transfer">Rp 0</span></div>
                     </div>
 
-                    <div class="summary-row difference">
-                        <span>Selisih</span>
-                        <span id="close-difference" class="neutral">Rp 0</span>
+                    <div class="closing-form">
+                        <h4>Hitung Fisik Uang (Cash)</h4>
+                        <div class="form-group">
+                            <label for="counted-cash">Masukkan Jumlah Uang Fisik</label>
+                            <input type="number" id="counted-cash" placeholder="0">
+                        </div>
+                        <div class="summary-row difference">
+                            <span>Selisih</span>
+                            <span id="close-difference" class="neutral">Rp 0</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="closing-notes">Catatan (Jika ada selisih)</label>
+                            <textarea id="closing-notes" rows="3"></textarea>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="closing-notes">Catatan (Jika ada selisih)</label>
-                        <textarea id="closing-notes" rows="3"></textarea>
+                    <div class="closing-actions">
+                        <button id="cancel-closing-btn" class="btn secondary">Batal</button>
+                        <button id="confirm-closing-btn" class="btn primary">Tutup Shift &amp; Logout</button>
                     </div>
-                </div>
-
-                <div class="actions">
-                    <button id="cancel-closing-btn" class="btn secondary">Batal</button>
-                    <button id="confirm-closing-btn" class="btn primary">Tutup Shift & Logout</button>
                 </div>
             </div>
         </section>
