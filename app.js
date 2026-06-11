@@ -559,11 +559,11 @@ window.loadTodayBookings = async function () {
             .where('visit_date').equals(today)
             .toArray();
 
+        // Hanya tampilkan yang belum diproses (pending) di tab Sales
+        bookings = bookings.filter(b => b.status === 'pending');
+
         bookings.sort((a, b) => {
-            if (a.status === b.status) return (a.arrival_time || '').localeCompare(b.arrival_time || '');
-            if (a.status === 'pending') return -1;
-            if (b.status === 'pending') return 1;
-            return 0;
+            return (a.arrival_time || '').localeCompare(b.arrival_time || '');
         });
 
         if (bookings.length === 0) {
@@ -594,8 +594,10 @@ window.loadAllBookings = async function () {
         const today = new Date().toISOString().slice(0, 10);
         // Load all
         let bookings = await db.bookings.toArray();
-        // Exclude today
-        bookings = bookings.filter(b => b.visit_date !== today);
+        
+        // Tampilkan semua data, KECUALI yang jadwalnya hari ini DAN masih pending
+        // (Karena yang hari ini dan masih pending sudah tampil di halaman depan/Sales)
+        bookings = bookings.filter(b => !(b.visit_date === today && b.status === 'pending'));
 
         // Sort descending by date
         bookings.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
