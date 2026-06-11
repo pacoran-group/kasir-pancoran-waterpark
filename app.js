@@ -10,15 +10,12 @@ const state = {
     currentUnit: null,
     activeBookingRef: null, // { id, booking_number, group_name }
     order: {
-        adult: 1,
-        child: 0,
-        free: 0
+        pax: 1,
+        promo: 0 // percentage
     },
     prices: {
         adult_regular: 28000,
         adult_rombongan: 20000, // min 30 pax
-        child: 10000,
-        free: 0,
         rombongan_min_pax: 30
     }
 };
@@ -52,10 +49,10 @@ function formatTime(isoString) {
 /**
  * Harga Rp 20.000 HANYA berlaku jika:
  * - Sumber = "Rombongan Sekolah" (bukan rombongan umum)
- * - Total pax dewasa + anak >= 30
+ * - Total pax >= 30
  */
 function isRombonganSekolahPrice() {
-    const totalPax = state.order.adult + state.order.child;
+    const totalPax = state.order.pax;
     const source = document.getElementById('visitor-source')?.value;
     return source === 'rombongan-sekolah' && totalPax >= state.prices.rombongan_min_pax;
 }
@@ -74,11 +71,6 @@ async function initApp() {
     document.getElementById('close-shift-btn').addEventListener('click', showClosingScreen);
     document.getElementById('cancel-closing-btn').addEventListener('click', hideClosingScreen);
     document.getElementById('confirm-closing-btn').addEventListener('click', submitClosingShift);
-
-    // Payment method changes
-    document.querySelectorAll('input[name="payment"]').forEach(radio => {
-        radio.addEventListener('change', updateOrderSummary);
-    });
 
     try {
         // Populate cashier select
@@ -134,7 +126,7 @@ function switchTab(tabName) {
     if (tab) tab.classList.add('active');
 
     // Load data when switching tabs
-    if (tabName === 'booking') loadTodayBookings();
+    if (tabName === 'booking') loadAllBookings();
     if (tabName === 'history') loadTodayHistory();
 }
 
@@ -201,7 +193,7 @@ async function handleLogin(e) {
         switchTab('sales');
         showScreen('cashier');
 
-        // Load today's bookings in background
+        // Load today's bookings in background for the sales tab
         setTimeout(loadTodayBookings, 500);
 
     } catch (err) {
@@ -214,38 +206,49 @@ async function handleLogin(e) {
 // Transaction Form
 // ================================================================
 window.updateCount = function (type, change) {
-    const input = document.getElementById(`${type}-count`);
+    if (type !== 'pax') return;
+    const input = document.getElementById(`pax-count`);
     let newVal = parseInt(input.value) + change;
-    if (newVal < 0) newVal = 0;
+    if (newVal < 1) newVal = 1;
     input.value = newVal;
-    state.order[type] = newVal;
+    state.order.pax = newVal;
     updateOrderSummary();
 };
 
 window.handleCountInput = function (type) {
-    const input = document.getElementById(`${type}-count`);
+    if (type !== 'pax') return;
+    const input = document.getElementById(`pax-count`);
     let newVal = parseInt(input.value);
     if (isNaN(newVal) || input.value === '') {
-        state.order[type] = 0;
+        state.order.pax = 1;
         updateOrderSummary();
         return;
     }
-    if (newVal < 0) { newVal = 0; input.value = 0; }
-    state.order[type] = newVal;
+    if (newVal < 1) { newVal = 1; input.value = 1; }
+    state.order.pax = newVal;
     updateOrderSummary();
 };
+
+window.handlePromoInput = function () {
+    const input = document.getElementById('promo-input');
+    let newVal = parseInt(input.value);
+    if (isNaN(newVal) || input.value === '') { newVal = 0; }
+    if (newVal < 0) { newVal = 0; input.value = 0; }
+    if (newVal > 100) { newVal = 100; input.value = 100; }
+    state.order.promo = newVal;
+    updateOrderSummary();
+}
 
 window.handleSourceChange = function () {
     updateOrderSummary();
 };
 
-function updateOrderSummary() {
+window.updateOrderSummary = function () {
     const adultPrice = getAdultPrice();
-    const adultTotal = state.order.adult * adultPrice;
-    const childTotal = state.order.child * state.prices.child;
-    const totalGuests = state.order.adult + state.order.child + state.order.free;
-    const subtotal = adultTotal + childTotal;
-    const discount = 0;
+    const subtotal = state.order.pax * adultPrice;
+    
+    // Calculate promo
+    const discount = Math.round((subtotal * state.order.promo) / 100);
     const total = subtotal - discount;
 
     // Update price badge
@@ -255,17 +258,15 @@ function updateOrderSummary() {
     const rombonganHint = document.getElementById('rombongan-hint');
     const rombonganUmumHint = document.getElementById('rombongan-umum-hint');
     const source = document.getElementById('visitor-source')?.value;
-    const totalPax = state.order.adult + state.order.child;
+    const totalPax = state.order.pax;
 
     if (isRombonganSekolahPrice()) {
-        // Sekolah >= 30 pax → harga diskon
         badge.className = 'price-badge rombongan';
         badgeLabel.textContent = 'Rombongan Sekolah';
         badgeValue.textContent = 'Rp 20.000 / orang';
         rombonganHint.classList.remove('hidden');
         rombonganUmumHint.classList.add('hidden');
     } else if (source === 'rombongan-sekolah' && totalPax < state.prices.rombongan_min_pax) {
-        // Sekolah tapi belum cukup 30 pax → tetap reguler, beri info
         badge.className = 'price-badge regular';
         badgeLabel.textContent = 'Reguler';
         badgeValue.textContent = `Rp 28.000 / orang`;
@@ -273,7 +274,6 @@ function updateOrderSummary() {
         rombonganUmumHint.classList.remove('hidden');
         rombonganUmumHint.textContent = `⚠️ Perlu min. 30 pax untuk harga sekolah (saat ini ${totalPax} pax)`;
     } else if (source === 'rombongan-umum') {
-        // Rombongan umum → selalu reguler
         badge.className = 'price-badge regular';
         badgeLabel.textContent = 'Reguler';
         badgeValue.textContent = 'Rp 28.000 / orang';
@@ -281,7 +281,6 @@ function updateOrderSummary() {
         rombonganUmumHint.classList.remove('hidden');
         rombonganUmumHint.textContent = 'ℹ️ Rombongan umum: harga reguler Rp 28.000/org';
     } else {
-        // Walk-in / travel agent → reguler
         badge.className = 'price-badge regular';
         badgeLabel.textContent = 'Reguler';
         badgeValue.textContent = 'Rp 28.000 / orang';
@@ -290,24 +289,20 @@ function updateOrderSummary() {
     }
 
     // Summary panel
-    document.getElementById('summary-guests').textContent = `${totalGuests} Orang`;
-    document.getElementById('summary-adult-label').textContent = `Dewasa ×${state.order.adult}${isRombonganSekolahPrice() ? ' (Sekolah)' : ''}`;
-    document.getElementById('summary-adult-val').textContent = formatRp(adultTotal);
-    document.getElementById('summary-child-label').textContent = `Anak ×${state.order.child}`;
-    document.getElementById('summary-child-val').textContent = formatRp(childTotal);
+    document.getElementById('summary-guests').textContent = `${totalPax} Pengunjung`;
     document.getElementById('summary-subtotal').textContent = formatRp(subtotal);
+    document.getElementById('summary-promo-pct').textContent = state.order.promo > 0 ? `(${state.order.promo}%)` : '';
     document.getElementById('summary-discount').textContent = '- ' + formatRp(discount);
     document.getElementById('summary-total').textContent = formatRp(total);
-}
+};
 
 function resetTransactionForm() {
-    state.order = { adult: 1, child: 0, free: 0 };
+    state.order = { pax: 1, promo: 0 };
     state.activeBookingRef = null;
-    document.getElementById('adult-count').value = 1;
-    document.getElementById('child-count').value = 0;
-    document.getElementById('free-count').value = 0;
+    document.getElementById('pax-count').value = 1;
+    document.getElementById('promo-input').value = 0;
     document.getElementById('visitor-source').value = 'walk-in';
-    document.querySelector('input[name="payment"][value="cash"]').checked = true;
+    document.getElementById('payment-method').value = 'cash';
 
     // Hide booking reference badge
     document.getElementById('booking-ref-badge').classList.add('hidden');
@@ -327,18 +322,13 @@ window.clearBookingRef = function () {
 
 function setBookingRef(booking) {
     state.activeBookingRef = booking;
+    const totalPax = (booking.adult_count || 0) + (booking.child_count || 0);
 
     // Auto-fill jumlah pengunjung
-    document.getElementById('adult-count').value = booking.adult_count || 0;
-    document.getElementById('child-count').value = booking.child_count || 0;
-    document.getElementById('free-count').value = 0;
-    state.order.adult = booking.adult_count || 0;
-    state.order.child = booking.child_count || 0;
-    state.order.free = 0;
+    document.getElementById('pax-count').value = totalPax || 1;
+    state.order.pax = totalPax || 1;
 
     // Auto-set sumber pengunjung sesuai tipe booking:
-    // - 'sekolah' → Rombongan Sekolah (eligible harga Rp 20.000 jika >= 30 pax)
-    // - 'umum'    → Rombongan Umum (selalu Rp 28.000)
     const visitorSource = booking.booking_type === 'sekolah' ? 'rombongan-sekolah' : 'rombongan-umum';
     document.getElementById('visitor-source').value = visitorSource;
 
@@ -359,19 +349,18 @@ function setBookingRef(booking) {
 // Process Payment
 // ================================================================
 async function processPayment(withPrint) {
-    const totalGuests = state.order.adult + state.order.child + state.order.free;
-    if (totalGuests === 0) {
+    const totalGuests = state.order.pax;
+    if (totalGuests < 1) {
         alert("Minimal 1 pengunjung.");
         return;
     }
 
     const adultPrice = getAdultPrice();
-    const adultTotal = state.order.adult * adultPrice;
-    const childTotal = state.order.child * state.prices.child;
-    const subtotal = adultTotal + childTotal;
-    const total = subtotal;
+    const subtotal = totalGuests * adultPrice;
+    const discountAmount = Math.round((subtotal * state.order.promo) / 100);
+    const total = subtotal - discountAmount;
 
-    const paymentMethod = document.querySelector('input[name="payment"]:checked').value;
+    const paymentMethod = document.getElementById('payment-method').value;
     const visitorSource = document.getElementById('visitor-source').value;
 
     const btnSubmit = document.getElementById('submit-only-btn');
@@ -399,12 +388,13 @@ async function processPayment(withPrint) {
             cashier_id: state.currentStaff.id,
             order_number: orderNum,
             total_guests: totalGuests,
-            adult_count: state.order.adult,
-            child_count: state.order.child,
-            free_count: state.order.free,
+            // Kita simpan ke adult_count untuk kompatibilitas schema, child & free = 0
+            adult_count: totalGuests,
+            child_count: 0,
+            free_count: 0,
             adult_price: adultPrice,
             subtotal: subtotal,
-            discount_amount: 0,
+            discount_amount: discountAmount,
             total_price: total,
             payment_method: paymentMethod,
             visitor_source: visitorSource,
@@ -425,9 +415,7 @@ async function processPayment(withPrint) {
             created_at: new Date().toISOString()
         });
 
-        for (let i = 0; i < state.order.adult; i++) newTickets.push(createTicketData('dewasa', adultPrice));
-        for (let i = 0; i < state.order.child; i++) newTickets.push(createTicketData('anak', state.prices.child));
-        for (let i = 0; i < state.order.free; i++) newTickets.push(createTicketData('gratis', 0));
+        for (let i = 0; i < totalGuests; i++) newTickets.push(createTicketData('dewasa', adultPrice));
 
         // 3. Simpan ke IndexedDB (local-first)
         await db.transaction('rw', db.orders, db.tickets, async () => {
@@ -499,10 +487,11 @@ async function processPayment(withPrint) {
 }
 
 // ================================================================
-// TODAY'S HISTORY
+// TODAY'S HISTORY (Transaksi Kasir)
 // ================================================================
-async function loadTodayHistory() {
+window.loadTodayHistory = async function () {
     const list = document.getElementById('history-list');
+    if (!list) return;
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Memuat...</p></div>';
 
     try {
@@ -536,7 +525,7 @@ async function loadTodayHistory() {
             list.appendChild(card);
         });
     } catch (err) {
-        list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Gagal memuat riwayat</p></div>';
+        if(list) list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Gagal memuat riwayat</p></div>';
         console.error("History Error:", err);
     }
 }
@@ -546,10 +535,11 @@ async function loadTodayHistory() {
 // ================================================================
 
 /**
- * Tampilkan daftar booking hari ini dari IndexedDB (+ pull dari Supabase jika online)
+ * Tampilkan daftar booking hari ini di tab Sales
  */
-async function loadTodayBookings() {
-    const list = document.getElementById('booking-list');
+window.loadTodayBookings = async function () {
+    const list = document.getElementById('sales-booking-list');
+    if (!list) return;
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Memuat reservasi...</p></div>';
 
     // Pull from Supabase jika online
@@ -561,7 +551,6 @@ async function loadTodayBookings() {
             .where('visit_date').equals(today)
             .toArray();
 
-        // Sort: pending dulu, lalu by arrival_time
         bookings.sort((a, b) => {
             if (a.status === b.status) return (a.arrival_time || '').localeCompare(b.arrival_time || '');
             if (a.status === 'pending') return -1;
@@ -575,7 +564,7 @@ async function loadTodayBookings() {
         }
 
         list.innerHTML = '';
-        bookings.forEach(booking => renderBookingCard(booking, list));
+        bookings.forEach(booking => renderBookingCard(booking, list, true));
     } catch (err) {
         list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Gagal memuat reservasi</p></div>';
         console.error("Booking load Error:", err);
@@ -583,9 +572,44 @@ async function loadTodayBookings() {
 }
 
 /**
- * Render satu kartu booking ke dalam container
+ * Tampilkan daftar booking SEMUA (Kecuali Hari ini) di tab Reservasi
  */
-function renderBookingCard(booking, container) {
+window.loadAllBookings = async function () {
+    const list = document.getElementById('all-booking-list');
+    if (!list) return;
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Memuat reservasi...</p></div>';
+
+    // Pull from Supabase jika online
+    await syncBookingsFromSupabase();
+
+    try {
+        const today = new Date().toISOString().slice(0, 10);
+        // Load all
+        let bookings = await db.bookings.toArray();
+        // Exclude today
+        bookings = bookings.filter(b => b.visit_date !== today);
+
+        // Sort descending by date
+        bookings.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
+
+        if (bookings.length === 0) {
+            list.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><p>Belum ada data reservasi lain</p></div>';
+            return;
+        }
+
+        list.innerHTML = '';
+        bookings.forEach(booking => renderBookingCard(booking, list, false));
+    } catch (err) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Gagal memuat reservasi</p></div>';
+        console.error("All Booking load Error:", err);
+    }
+}
+
+/**
+ * Render satu kartu booking ke dalam container
+ * showProcessBtn: apakah menampilkan tombol "Proses Tiket" atau tidak
+ */
+function renderBookingCard(booking, container, showProcessBtn = true) {
     const totalPax = (booking.adult_count || 0) + (booking.child_count || 0);
     const isSekolah = booking.booking_type === 'sekolah';
     const isDiskonSekolah = isSekolah && totalPax >= state.prices.rombongan_min_pax;
@@ -635,8 +659,6 @@ function renderBookingCard(booking, container) {
         </div>
 
         <div class="booking-pax-row">
-            <span class="pax-chip adult">👨‍👩‍👧 ${booking.adult_count || 0} Dewasa</span>
-            ${(booking.child_count || 0) > 0 ? `<span class="pax-chip child">👶 ${booking.child_count} Anak</span>` : ''}
             <span class="pax-chip total">Total: ${totalPax} pax</span>
             ${isDiskonSekolah
                 ? `<span class="rombongan-price-tag">🏷️ Rp 20.000/org</span>`
@@ -648,8 +670,9 @@ function renderBookingCard(booking, container) {
 
         ${booking.notes ? `<div class="booking-card-notes">📝 ${booking.notes}</div>` : ''}
 
-        <div class="booking-card-footer">
-            ${!isArrived && !isCancelled ? `
+        <div class="booking-card-footer" style="display: flex; gap: 8px; justify-content: flex-end;">
+            ${showProcessBtn ? (
+                !isArrived && !isCancelled ? `
                 <button class="btn-process" onclick="processBookingToSales('${booking.id}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
                         <polyline points="9 11 12 14 22 4"/>
@@ -657,10 +680,16 @@ function renderBookingCard(booking, container) {
                     </svg>
                     Proses Tiket
                 </button>
-            ` : `
+                ` : `
                 <span class="btn-process-done">
                     ${isArrived ? '✅ Sudah Diproses' : '❌ Dibatalkan'}
                 </span>
+                `
+            ) : `
+                <!-- Edit Button -->
+                <button class="btn secondary outline" style="padding: 6px 12px; font-size: 12px; min-width: 0;" onclick="openBookingModal('${booking.id}')">
+                    ✏️ Edit
+                </button>
             `}
         </div>
     `;
@@ -697,32 +726,29 @@ async function markBookingArrived(bookingId) {
                 .eq('id', bookingId);
         }
 
-        // Refresh booking list jika tab booking sedang aktif
-        const bookingTab = document.getElementById('tab-booking');
-        if (bookingTab && bookingTab.classList.contains('active')) {
-            await loadTodayBookings();
-        }
+        // Refresh booking list di sales tab
+        await loadTodayBookings();
     } catch (err) {
         console.warn("markBookingArrived error:", err);
     }
 }
 
 /**
- * Pull booking hari ini dari Supabase ke IndexedDB
+ * Pull booking dari Supabase ke IndexedDB
  */
 async function syncBookingsFromSupabase() {
     if (!navigator.onLine || !window.supabaseInstance) return;
 
     try {
-        const today = new Date().toISOString().slice(0, 10);
+        // Karena kita butuh semua data untuk history dan hari ini, fetch semua yg belum arrived/cancelled hari ini
+        // Atau ambil semuanya saja dan replace local db (selama tidak conflict)
         const { data, error } = await window.supabaseInstance
             .from('bookings')
             .select('*')
-            .eq('visit_date', today)
-            .neq('status', 'cancelled');
+            .order('visit_date', { ascending: false })
+            .limit(100);
 
         if (error) {
-            // Tabel mungkin belum dibuat — tidak error fatal
             console.warn("Booking sync (Supabase):", error.message);
             return;
         }
@@ -743,6 +769,111 @@ function formatVisitDate(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+// ================================================================
+// BOOKING CRUD MANAGEMENT (MODAL)
+// ================================================================
+
+window.openBookingModal = async function(bookingId = null) {
+    document.getElementById('booking-modal').classList.remove('hidden');
+    const form = document.getElementById('booking-form');
+    form.reset();
+    
+    if (bookingId) {
+        document.getElementById('booking-modal-title').textContent = "Edit Reservasi";
+        try {
+            const booking = await db.bookings.get(bookingId);
+            if (booking) {
+                document.getElementById('booking-id').value = booking.id;
+                document.getElementById('bk-name').value = booking.group_name;
+                document.getElementById('bk-type').value = booking.booking_type || 'sekolah';
+                document.getElementById('bk-pax').value = (booking.adult_count || 0) + (booking.child_count || 0);
+                document.getElementById('bk-date').value = booking.visit_date;
+                document.getElementById('bk-time').value = booking.arrival_time;
+                document.getElementById('bk-pic').value = booking.contact_name;
+                document.getElementById('bk-phone').value = booking.contact_phone;
+                document.getElementById('bk-notes').value = booking.notes;
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Gagal memuat data booking.");
+        }
+    } else {
+        document.getElementById('booking-modal-title').textContent = "Tambah Reservasi";
+        document.getElementById('booking-id').value = '';
+    }
+};
+
+window.closeBookingModal = function() {
+    document.getElementById('booking-modal').classList.add('hidden');
+};
+
+window.saveBooking = async function(event) {
+    event.preventDefault();
+    
+    const id = document.getElementById('booking-id').value;
+    const isNew = !id;
+    const bookingId = isNew ? uuidv4() : id;
+    const pax = parseInt(document.getElementById('bk-pax').value) || 0;
+    
+    // Generate simple booking number if new
+    let bookingNumber = '';
+    if (isNew) {
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        bookingNumber = `BK-${dateStr}-${randomNum}`;
+    }
+
+    const bookingData = {
+        id: bookingId,
+        unit_id: state.currentUnit?.id || 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        group_name: document.getElementById('bk-name').value,
+        booking_type: document.getElementById('bk-type').value,
+        adult_count: pax, // All mapped to adult_count to match DB schema total
+        child_count: 0,
+        visit_date: document.getElementById('bk-date').value,
+        arrival_time: document.getElementById('bk-time').value,
+        contact_name: document.getElementById('bk-pic').value,
+        contact_phone: document.getElementById('bk-phone').value,
+        notes: document.getElementById('bk-notes').value,
+        status: 'pending',
+        updated_at: new Date().toISOString()
+    };
+    
+    if (isNew) {
+        bookingData.booking_number = bookingNumber;
+        bookingData.created_at = new Date().toISOString();
+    }
+
+    try {
+        // Save to Local DB
+        if (isNew) {
+            await db.bookings.add(bookingData);
+        } else {
+            const existing = await db.bookings.get(bookingId);
+            await db.bookings.update(bookingId, { ...existing, ...bookingData });
+        }
+
+        // Save to Supabase
+        if (navigator.onLine && window.supabaseInstance) {
+            const { error } = await window.supabaseInstance
+                .from('bookings')
+                .upsert([isNew ? bookingData : { ...bookingData, booking_number: (await db.bookings.get(bookingId)).booking_number }]);
+            
+            if (error) console.error("Supabase booking error:", error);
+        }
+
+        closeBookingModal();
+        alert(isNew ? "Reservasi berhasil ditambahkan!" : "Reservasi berhasil diperbarui!");
+        
+        // Refresh lists
+        loadAllBookings();
+        loadTodayBookings();
+    } catch (e) {
+        console.error("Save booking failed:", e);
+        alert("Gagal menyimpan reservasi: " + e.message);
+    }
+};
 
 // ================================================================
 // Closing Shift

@@ -1008,3 +1008,49 @@ input:focus, select:focus, textarea:focus {
     :root { --summary-width: 0px; }
     .summary-panel { display: none; }
 }
+
+/* ================================================================
+   MODAL (BOOKING MANAGEMENT)
+   ================================================================ */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.5); z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+}
+.modal-overlay.hidden { display: none; }
+.modal-card {
+    background: var(--surface); width: 90%; max-width: 600px;
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column; max-height: 90vh;
+}
+.modal-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header h3 { margin: 0; font-size: 18px; color: var(--text-dark); }
+.btn-close-modal {
+    background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);
+}
+.modal-body { padding: 24px; overflow-y: auto; }
+.modal-footer {
+    padding: 16px 24px; border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 12px;
+}
+.modal-footer button { padding: 8px 16px; }
+
+/* History List Layout */
+.history-list {
+    display: flex; flex-direction: column; gap: 12px;
+    max-height: calc(100vh - 200px); overflow-y: auto;
+}
+.history-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.history-item-left { display: flex; flex-direction: column; gap: 4px; }
+.history-item-title { font-weight: 600; color: var(--text-dark); }
+.history-item-meta { font-size: 12px; color: var(--text-muted); }
+.history-item-right { text-align: right; }
+.history-item-price { font-weight: 700; color: var(--primary-dark); font-size: 16px; }

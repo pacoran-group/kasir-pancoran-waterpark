@@ -130,51 +130,24 @@
                         <div class="sales-panel">
                             <h3 class="panel-title">Order Details</h3>
                             <div class="order-form-grid">
-                                <!-- Dewasa -->
+                                <!-- Jumlah Pengunjung -->
                                 <div class="order-field">
-                                    <label class="field-label">Jumlah Pengunjung Dewasa</label>
+                                    <label class="field-label">Jumlah Pengunjung</label>
                                     <div class="counter">
-                                        <button class="btn-count" onclick="updateCount('adult', -1)">−</button>
-                                        <input type="number" id="adult-count" value="1" min="0"
-                                            oninput="handleCountInput('adult')" onchange="handleCountInput('adult')">
-                                        <button class="btn-count" onclick="updateCount('adult', 1)">+</button>
+                                        <button class="btn-count" onclick="updateCount('pax', -1)">−</button>
+                                        <input type="number" id="pax-count" value="1" min="1"
+                                            oninput="handleCountInput('pax')" onchange="handleCountInput('pax')">
+                                        <button class="btn-count" onclick="updateCount('pax', 1)">+</button>
                                     </div>
                                 </div>
 
-                                <!-- Promo / Harga info -->
+                                <!-- Promo / Diskon -->
                                 <div class="order-field">
-                                    <label class="field-label">Harga Berlaku</label>
-                                    <div id="price-badge" class="price-badge regular">
-                                        <span id="price-badge-label">Reguler</span>
-                                        <span id="price-badge-value">Rp 28.000 / orang</span>
-                                    </div>
-                                    <p id="rombongan-hint" class="rombongan-hint hidden">
-                                        🎉 Harga Sekolah aktif (min. 30 pax) — Rp 20.000/org
-                                    </p>
-                                    <p id="rombongan-umum-hint" class="rombongan-umum-hint hidden">
-                                        ℹ️ Rombongan umum: harga reguler Rp 28.000/org
-                                    </p>
-                                </div>
-
-                                <!-- Anak -->
-                                <div class="order-field">
-                                    <label class="field-label">Anak &lt; 5 thn <span class="price-tag">Rp 10.000</span></label>
-                                    <div class="counter">
-                                        <button class="btn-count" onclick="updateCount('child', -1)">−</button>
-                                        <input type="number" id="child-count" value="0" min="0"
-                                            oninput="handleCountInput('child')" onchange="handleCountInput('child')">
-                                        <button class="btn-count" onclick="updateCount('child', 1)">+</button>
-                                    </div>
-                                </div>
-
-                                <!-- Gratis / VIP -->
-                                <div class="order-field">
-                                    <label class="field-label">Gratis / VIP <span class="price-tag free">Rp 0</span></label>
-                                    <div class="counter">
-                                        <button class="btn-count" onclick="updateCount('free', -1)">−</button>
-                                        <input type="number" id="free-count" value="0" min="0"
-                                            oninput="handleCountInput('free')" onchange="handleCountInput('free')">
-                                        <button class="btn-count" onclick="updateCount('free', 1)">+</button>
+                                    <label class="field-label">Promo / Diskon (%)</label>
+                                    <div class="counter" style="position: relative;">
+                                        <input type="number" id="promo-input" value="0" min="0" max="100"
+                                            oninput="handlePromoInput()" style="border-radius: var(--radius); border-left: 1.5px solid var(--border); border-right: 1.5px solid var(--border);">
+                                        <span style="position: absolute; right: 15px; color: var(--text-muted); font-weight: bold;">%</span>
                                     </div>
                                 </div>
 
@@ -191,21 +164,26 @@
 
                                 <!-- Metode Pembayaran -->
                                 <div class="order-field">
-                                    <label class="field-label">Metode Pembayaran</label>
-                                    <div class="payment-methods">
-                                        <label class="pay-opt">
-                                            <input type="radio" name="payment" value="cash" checked>
-                                            <span>Cash</span>
-                                        </label>
-                                        <label class="pay-opt">
-                                            <input type="radio" name="payment" value="qris">
-                                            <span>QRIS</span>
-                                        </label>
-                                        <label class="pay-opt">
-                                            <input type="radio" name="payment" value="transfer">
-                                            <span>Transfer</span>
-                                        </label>
+                                    <label class="field-label" for="payment-method">Metode Pembayaran</label>
+                                    <select id="payment-method" onchange="updateOrderSummary()">
+                                        <option value="cash">Cash</option>
+                                        <option value="qris">QRIS</option>
+                                        <option value="transfer">Transfer</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Harga Berlaku Info (Span across columns) -->
+                                <div class="order-field" style="grid-column: 1 / -1; margin-top: -10px;">
+                                    <div id="price-badge" class="price-badge regular">
+                                        <span id="price-badge-label">Reguler</span>
+                                        <span id="price-badge-value">Rp 28.000 / orang</span>
                                     </div>
+                                    <p id="rombongan-hint" class="rombongan-hint hidden">
+                                        🎉 Harga Sekolah aktif (min. 30 pax) — Rp 20.000/org
+                                    </p>
+                                    <p id="rombongan-umum-hint" class="rombongan-umum-hint hidden">
+                                        ℹ️ Rombongan umum: harga reguler Rp 28.000/org
+                                    </p>
                                 </div>
                             </div>
 
@@ -216,6 +194,20 @@
                                 </svg>
                                 <span id="booking-ref-text">Reservasi: —</span>
                                 <button class="clear-booking-btn" onclick="clearBookingRef()" title="Hapus referensi booking">✕</button>
+                            </div>
+                        </div>
+
+                        <!-- Reservasi Hari Ini (Moved here) -->
+                        <div class="sales-panel" style="margin-top: 24px;">
+                            <div class="content-header" style="margin-bottom: 12px;">
+                                <h3 class="panel-title">Reservasi Akan Datang Hari Ini</h3>
+                                <button class="btn-refresh" onclick="loadTodayBookings()">↻ Refresh</button>
+                            </div>
+                            <div id="sales-booking-list" class="booking-list">
+                                <div class="empty-state">
+                                    <div class="empty-icon">📅</div>
+                                    <p>Tidak ada reservasi hari ini</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -234,16 +226,19 @@
                         </div>
                     </div>
 
-                    <!-- === TAB: BOOKING === -->
+                    <!-- === TAB: BOOKING (MANAGE) === -->
                     <div id="tab-booking" class="tab-content">
                         <div class="content-header">
-                            <h3 class="panel-title">Reservasi Hari Ini</h3>
-                            <button class="btn-refresh" onclick="loadTodayBookings()">↻ Refresh</button>
+                            <h3 class="panel-title">Data Reservasi (Kecuali Hari Ini)</h3>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn-refresh" onclick="loadAllBookings()">↻ Refresh</button>
+                                <button class="btn primary" onclick="openBookingModal()" style="width: auto; padding: 6px 14px;">+ Tambah Reservasi</button>
+                            </div>
                         </div>
-                        <div id="booking-list" class="booking-list">
+                        <div id="all-booking-list" class="booking-list">
                             <div class="empty-state">
                                 <div class="empty-icon">📅</div>
-                                <p>Tidak ada reservasi hari ini</p>
+                                <p>Memuat reservasi...</p>
                             </div>
                         </div>
                     </div>
@@ -267,21 +262,13 @@
                             <span>Total Pengunjung</span>
                             <span id="summary-guests" class="summary-val">1 Orang</span>
                         </div>
-                        <div class="summary-row sub">
-                            <span id="summary-adult-label">Dewasa (×1)</span>
-                            <span id="summary-adult-val">Rp 28.000</span>
-                        </div>
-                        <div class="summary-row sub" id="summary-child-row">
-                            <span id="summary-child-label">Anak (×0)</span>
-                            <span id="summary-child-val">Rp 0</span>
-                        </div>
                         <div class="summary-divider"></div>
                         <div class="summary-row">
                             <span>Sub Total</span>
                             <span id="summary-subtotal">Rp 28.000</span>
                         </div>
                         <div class="summary-row promo-row">
-                            <span>Promo/Diskon</span>
+                            <span>Promo/Diskon <span id="summary-promo-pct"></span></span>
                             <span id="summary-discount" class="promo-val">- Rp 0</span>
                         </div>
                         <div class="summary-divider dashed"></div>
@@ -344,6 +331,63 @@
                 </div>
             </div>
         </section>
+        
+        <!-- ===================== 4. BOOKING MODAL ===================== -->
+        <div id="booking-modal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3 id="booking-modal-title">Tambah Reservasi</h3>
+                    <button class="btn-close-modal" onclick="closeBookingModal()">✕</button>
+                </div>
+                <form id="booking-form" onsubmit="saveBooking(event)">
+                    <input type="hidden" id="booking-id">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Nama Sekolah / Rombongan *</label>
+                            <input type="text" id="bk-name" required>
+                        </div>
+                        <div class="order-form-grid">
+                            <div class="form-group">
+                                <label>Tipe Reservasi *</label>
+                                <select id="bk-type" required>
+                                    <option value="sekolah">Sekolah (Diskon jika ≥30 pax)</option>
+                                    <option value="umum">Umum (Reguler)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Jumlah Pengunjung *</label>
+                                <input type="number" id="bk-pax" required min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>Tanggal Kedatangan *</label>
+                                <input type="date" id="bk-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Jam Kedatangan</label>
+                                <input type="time" id="bk-time">
+                            </div>
+                            <div class="form-group">
+                                <label>Nama PIC</label>
+                                <input type="text" id="bk-pic">
+                            </div>
+                            <div class="form-group">
+                                <label>No HP PIC</label>
+                                <input type="text" id="bk-phone">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Catatan</label>
+                            <textarea id="bk-notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn secondary" onclick="closeBookingModal()" style="width: auto;">Batal</button>
+                        <button type="submit" class="btn primary" style="width: auto;">Simpan Reservasi</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </div>
 
     <!-- Hidden area for printing -->
