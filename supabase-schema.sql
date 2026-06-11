@@ -5,6 +5,19 @@
 -- ================================================================
 
 -- ----------------------------------------------------------------
+-- RESET DATABASE (Hapus Data Lama)
+-- ----------------------------------------------------------------
+-- Peringatan: Script ini akan MENGHAPUS SEMUA DATA lama!
+DROP TABLE IF EXISTS print_queue CASCADE;
+DROP TABLE IF EXISTS tickets CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS shifts CASCADE;
+DROP TABLE IF EXISTS promos CASCADE;
+DROP TABLE IF EXISTS staff CASCADE;
+DROP TABLE IF EXISTS bookings CASCADE;
+DROP TABLE IF EXISTS units CASCADE;
+
+-- ----------------------------------------------------------------
 -- EKSTENSI
 -- ----------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
