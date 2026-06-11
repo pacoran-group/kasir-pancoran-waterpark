@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Reservasi - Pancoran Waterpark</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header img {
+            height: 60px;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: var(--primary-dark);
+        }
+
+        .header p {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn-submit {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+
+        .btn-submit:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-submit:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+        }
+
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .success-message h2 {
+            color: #10b981;
+            margin-bottom: 10px;
+        }
+
+        .success-message p {
+            color: var(--text-light);
+            margin-bottom: 20px;
+        }
+
+        .btn-back {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #e2e8f0;
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="form-section">
+        <div class="header">
+            <img src="Logo%20Pancoran%20Waterpark.webp" alt="Pancoran Waterpark">
+            <h1>Form Reservasi Rombongan</h1>
+            <p>Silakan isi data kunjungan Anda dengan lengkap.</p>
+        </div>
+
+        <form id="public-booking-form">
+            <div class="form-group">
+                <label>Nama Rombongan / Instansi</label>
+                <input type="text" id="bk-name" required placeholder="Contoh: SDN 01 Pancoran">
+            </div>
+
+            <div class="form-group">
+                <label>Jenis Rombongan</label>
+                <select id="bk-type" required>
+                    <option value="sekolah">🏫 Rombongan Sekolah / Instansi Pendidikan</option>
+                    <option value="umum">👥 Rombongan Umum / Keluarga / Travel</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Nama Penanggung Jawab</label>
+                    <input type="text" id="bk-pic" required placeholder="Nama PIC">
+                </div>
+                <div class="form-group">
+                    <label>Nomor WhatsApp / HP</label>
+                    <input type="tel" id="bk-phone" required placeholder="0812...">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Tanggal Kunjungan</label>
+                    <input type="date" id="bk-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Perkiraan Jam Datang</label>
+                    <input type="time" id="bk-time" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Total Perkiraan Pengunjung (Orang)</label>
+                <input type="number" id="bk-pax" min="1" required placeholder="Jumlah peserta">
+            </div>
+
+            <div class="form-group">
+                <label>Catatan Tambahan (Opsional)</label>
+                <textarea id="bk-notes" rows="3" placeholder="Contoh: Butuh area kumpul, dsb."></textarea>
+            </div>
+
+            <button type="submit" id="submit-btn" class="btn-submit">Kirim Reservasi</button>
+        </form>
+    </div>
+
+    <div id="success-section" class="success-message">
+        <div style="font-size: 60px; margin-bottom: 20px;">✅</div>
+        <h2>Reservasi Berhasil Diterima!</h2>
+        <p>Terima kasih, data rombongan Anda telah masuk ke dalam sistem kasir kami. Silakan sebutkan nama rombongan Anda kepada petugas tiket saat kedatangan.</p>
+        <button onclick="location.reload()" class="btn-back">Buat Reservasi Baru</button>
+    </div>
+</div>
+
+<script src="supabase-config.js"></script>
+<script>
+    // UUID generator
+    function uuidv4() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('bk-date').setAttribute('min', today);
+
+    document.getElementById('public-booking-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'Mengirim data...';
+
+        try {
+            // Check if supabase is loaded
+            if (!window.supabaseInstance) {
+                throw new Error("Gagal terhubung ke database. Coba muat ulang halaman.");
+            }
+
+            // Generate booking number
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            const bookingNumber = `BK-${dateStr}-${randomNum}`;
+
+            const bookingData = {
+                id: uuidv4(),
+                unit_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', // ID default Pancoran Waterpark
+                booking_number: bookingNumber,
+                group_name: document.getElementById('bk-name').value,
+                booking_type: document.getElementById('bk-type').value,
+                adult_count: parseInt(document.getElementById('bk-pax').value) || 0,
+                child_count: 0,
+                visit_date: document.getElementById('bk-date').value,
+                arrival_time: document.getElementById('bk-time').value,
+                contact_name: document.getElementById('bk-pic').value,
+                contact_phone: document.getElementById('bk-phone').value,
+                notes: document.getElementById('bk-notes').value,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await window.supabaseInstance
+                .from('bookings')
+                .insert([bookingData]);
+
+            if (error) throw error;
+
+            // Show success
+            document.getElementById('form-section').style.display = 'none';
+            document.getElementById('success-section').style.display = 'block';
+
+        } catch (error) {
+            console.error(error);
+            alert("Terjadi kesalahan: " + error.message);
+            btn.disabled = false;
+            btn.textContent = 'Kirim Reservasi';
+        }
+    });
+</script>
+
+</body>
+</html>
