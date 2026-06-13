@@ -1287,8 +1287,12 @@ function showPrintQueueNotice(orderNum) {
 // ================================================================
 
 let financeLoadedData = [];
+let financeFilteredData = [];
+let financeCurrentPage = 1;
+const FINANCE_ITEMS_PER_PAGE = 8;
+let financeCashierMap = {};
 
-window.showFinanceLogin = function() {
+window.showFinanceLogin = async function() {
     const pin = prompt("Masukkan PIN Khusus Finance:");
     if (pin === "888888") {
         showScreen('finance');
@@ -1296,6 +1300,24 @@ window.showFinanceLogin = function() {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('finance-start-date').value = today;
         document.getElementById('finance-end-date').value = today;
+        
+        // Load cashiers for filter
+        if (window.db) {
+            try {
+                const staffList = await db.staff.toArray();
+                const select = document.getElementById('finance-cashier-filter');
+                select.innerHTML = '<option value="">Semua Kasir</option>';
+                staffList.forEach(s => {
+                    financeCashierMap[s.id] = s.name;
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.name;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error("Gagal meload daftar kasir", e);
+            }
+        }
     } else if (pin !== null) {
         alert("PIN Finance salah!");
     }
@@ -1332,17 +1354,33 @@ window.loadFinanceData = async function() {
             .lte('created_at', endDateStr)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        const cashierFilter = document.getElementById('finance-cashier-filter').value;
 
-        financeLoadedData = data || [];
+        // Apply Kasir filter if any
+        financeLoadedData = (data || []);
+        financeFilteredData = financeLoadedData;
+        if (cashierFilter) {
+            financeFilteredData = financeLoadedData.filter(o => o.cashier_id === cashierFilter || (o.shift_id && o.shift_id.includes(cashierFilter))); // Approximation if exact relation isn't returned
+        }
+        
+        financeCurrentPage = 1;
         renderFinanceTable();
 
     } catch (err) {
         console.error("Finance fetch error:", err);
         alert("Gagal menarik data dari server.");
     } finally {
-        btn.textContent = originalText;
+        btn.innerHTML = originalText;
         btn.disabled = false;
+    }
+}
+
+window.changeFinancePage = function(delta) {
+    const maxPage = Math.ceil(financeFilteredData.length / FINANCE_ITEMS_PER_PAGE);
+    const newPage = financeCurrentPage + delta;
+    if (newPage >= 1 && newPage <= maxPage) {
+        financeCurrentPage = newPage;
+        renderFinanceTable();
     }
 }
 
@@ -1352,70 +1390,112 @@ function renderFinanceTable() {
     const emptyState = document.getElementById('finance-empty');
     const btnDownload = document.getElementById('btn-download-excel');
     const summaryContainer = document.getElementById('finance-summary');
+    const pagination = document.getElementById('finance-pagination');
 
-    if (financeLoadedData.length === 0) {
+    if (financeFilteredData.length === 0) {
         table.style.display = 'none';
         btnDownload.style.display = 'none';
-        emptyState.style.display = 'flex';
-        emptyState.querySelector('p').textContent = "Tidak ada transaksi pada rentang tanggal tersebut.";
+        pagination.style.display = 'none';
+        emptyState.style.display = 'block';
         summaryContainer.innerHTML = '';
         return;
     }
 
-    // Process summary
+    // Process summary (Always calculate summary for ALL filtered data, not just current page)
     let totalRevenue = 0;
     let totalCash = 0;
     let totalQris = 0;
     let totalTransfer = 0;
     let totalPax = 0;
 
-    tbody.innerHTML = '';
-    financeLoadedData.forEach(o => {
+    financeFilteredData.forEach(o => {
         totalRevenue += o.total_price || 0;
         totalPax += o.total_guests || 0;
         
         if (o.payment_method === 'cash') totalCash += o.total_price;
         else if (o.payment_method === 'qris') totalQris += o.total_price;
         else if (o.payment_method === 'transfer') totalTransfer += o.total_price;
+    });
+
+    // Pagination logic
+    const startIndex = (financeCurrentPage - 1) * FINANCE_ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + FINANCE_ITEMS_PER_PAGE, financeFilteredData.length);
+    const pageData = financeFilteredData.slice(startIndex, endIndex);
+
+    tbody.innerHTML = '';
+    pageData.forEach(o => {
+        const cashierName = financeCashierMap[o.cashier_id] || 'Kasir';
+        const methodBadgeColor = o.payment_method === 'cash' ? '#3b82f6' : (o.payment_method === 'qris' ? '#10b981' : '#f59e0b');
+        const methodBadgeBg = o.payment_method === 'cash' ? '#eff6ff' : (o.payment_method === 'qris' ? '#ecfdf5' : '#fffbeb');
 
         const tr = document.createElement('tr');
+        tr.style.borderBottom = "1px solid #f3f4f6";
         tr.innerHTML = `
-            <td>${new Date(o.created_at).toLocaleString('id-ID')}</td>
-            <td><strong>${o.order_number}</strong></td>
-            <td>${o.total_guests} org</td>
-            <td>${o.visitor_source || 'Walk-in'}</td>
-            <td><span style="background: #e2e8f0; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">${(o.payment_method || '').toUpperCase()}</span></td>
-            <td>${formatRp(o.subtotal)}</td>
-            <td>${o.discount_amount > 0 ? formatRp(o.discount_amount) : '-'}</td>
-            <td><strong>${formatRp(o.total_price)}</strong></td>
+            <td style="padding: 16px 24px; font-size: 13px;">${new Date(o.created_at).toLocaleString('id-ID', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})}</td>
+            <td style="padding: 16px 24px; font-size: 13px; font-weight: 600; color: #111827;">${o.order_number}</td>
+            <td style="padding: 16px 24px; font-size: 13px;">${o.total_guests} org</td>
+            <td style="padding: 16px 24px; font-size: 13px;">${o.visitor_source || 'walk-in'}</td>
+            <td style="padding: 16px 24px; font-size: 13px;"><span style="background: ${methodBadgeBg}; color: ${methodBadgeColor}; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;">${(o.payment_method || '').toUpperCase()}</span></td>
+            <td style="padding: 16px 24px; font-size: 13px; text-align: right;">${formatRp(o.subtotal)}</td>
+            <td style="padding: 16px 24px; font-size: 13px; text-align: right;">${o.discount_amount > 0 ? formatRp(o.discount_amount) : '-'}</td>
+            <td style="padding: 16px 24px; font-size: 13px; font-weight: 600; color: #10b981; text-align: right;">${formatRp(o.total_price)}</td>
+            <td style="padding: 16px 24px; font-size: 13px;">${cashierName}</td>
         `;
         tbody.appendChild(tr);
     });
 
     // Show summary cards
     summaryContainer.innerHTML = `
-        <div class="finance-summary-card">
-            <div class="finance-summary-title">Total Pendapatan</div>
-            <div class="finance-summary-value" style="color: #10b981;">${formatRp(totalRevenue)}</div>
+        <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e5e7eb; border-left: 4px solid #10b981; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 16px;">
+            <div style="background: #ecfdf5; padding: 12px; border-radius: 10px; color: #10b981;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+            </div>
+            <div>
+                <div style="font-size: 13px; color: #6b7280; font-weight: 500;">Total Pendapatan</div>
+                <div style="font-size: 20px; font-weight: 700; color: #10b981; margin-top: 2px;">${formatRp(totalRevenue)}</div>
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">Semua Metode</div>
+            </div>
         </div>
-        <div class="finance-summary-card">
-            <div class="finance-summary-title">Rincian Pembayaran</div>
-            <div style="font-size: 13px; margin-top: 5px;">Cash: <strong>${formatRp(totalCash)}</strong></div>
-            <div style="font-size: 13px;">QRIS: <strong>${formatRp(totalQris)}</strong></div>
-            <div style="font-size: 13px;">Transfer: <strong>${formatRp(totalTransfer)}</strong></div>
+        <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e5e7eb; border-left: 4px solid #3b82f6; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 16px;">
+            <div style="background: #eff6ff; padding: 12px; border-radius: 10px; color: #3b82f6;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            </div>
+            <div>
+                <div style="font-size: 13px; color: #6b7280; font-weight: 500;">Rincian Pembayaran</div>
+                <div style="font-size: 12px; color: #374151; margin-top: 4px;">Cash: <strong>${formatRp(totalCash)}</strong></div>
+                <div style="font-size: 12px; color: #374151;">QRIS: <strong>${formatRp(totalQris)}</strong></div>
+                <div style="font-size: 12px; color: #374151;">Transfer: <strong>${formatRp(totalTransfer)}</strong></div>
+            </div>
         </div>
-        <div class="finance-summary-card">
-            <div class="finance-summary-title">Total Transaksi</div>
-            <div class="finance-summary-value">${financeLoadedData.length} <span style="font-size: 14px; color: #64748b; font-weight: normal;">struk</span></div>
+        <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e5e7eb; border-left: 4px solid #a855f7; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 16px;">
+            <div style="background: #f3e8ff; padding: 12px; border-radius: 10px; color: #a855f7;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            </div>
+            <div>
+                <div style="font-size: 13px; color: #6b7280; font-weight: 500;">Total Transaksi</div>
+                <div style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 2px;">${financeFilteredData.length}</div>
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">Struk</div>
+            </div>
         </div>
-        <div class="finance-summary-card">
-            <div class="finance-summary-title">Total Pengunjung</div>
-            <div class="finance-summary-value">${totalPax} <span style="font-size: 14px; color: #64748b; font-weight: normal;">pax</span></div>
+        <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e5e7eb; border-left: 4px solid #f59e0b; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 16px;">
+            <div style="background: #fffbeb; padding: 12px; border-radius: 10px; color: #f59e0b;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <div>
+                <div style="font-size: 13px; color: #6b7280; font-weight: 500;">Total Pengunjung</div>
+                <div style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 2px;">${totalPax}</div>
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">Pax</div>
+            </div>
         </div>
     `;
 
+    // Update Pagination
+    document.getElementById('finance-page-info').textContent = `Menampilkan ${startIndex + 1} - ${endIndex} dari ${financeFilteredData.length} data`;
+    document.getElementById('finance-btn-page').textContent = financeCurrentPage;
+    
     table.style.display = 'table';
-    btnDownload.style.display = 'inline-flex';
+    btnDownload.style.display = 'flex';
+    pagination.style.display = 'flex';
     emptyState.style.display = 'none';
 }
 
