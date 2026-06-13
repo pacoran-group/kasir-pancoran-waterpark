@@ -579,9 +579,18 @@ window.printZReport = async function(shiftData) {
             hour: '2-digit', minute: '2-digit'
         });
 
-        // Buat window baru untuk nge-print dengan ukuran kertas struk (80mm)
-        const printWindow = window.open('', '_blank', 'width=400,height=600');
-        printWindow.document.write(`
+        // Buat iframe tersembunyi untuk mencetak (menghindari popup blocker)
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
+        iframe.contentWindow.document.open();
+        iframe.contentWindow.document.write(`
             <html>
             <head>
                 <title>Z-Report Kasir</title>
@@ -665,13 +674,13 @@ window.printZReport = async function(shiftData) {
             </body>
             </html>
         `);
-        printWindow.document.close();
-        printWindow.focus();
+        iframe.contentWindow.document.close();
+        iframe.contentWindow.focus();
         
         // Timeout agar browser me-render HTML dulu
         setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
+            iframe.contentWindow.print();
+            setTimeout(() => { document.body.removeChild(iframe); }, 1000);
         }, 500);
 
     } catch (err) {
