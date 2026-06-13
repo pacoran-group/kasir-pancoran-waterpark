@@ -99,6 +99,10 @@ async function syncData() {
                 if (orderError) {
                     if (orderError.code === '23505' || orderError.status === 409) {
                         orderConflict = true; // Mark as conflict but proceed
+                    } else if (orderError.code === '23503' && orderError.details && orderError.details.includes('table "shifts"')) {
+                        console.warn(`Order Sync: Shift missing on server. Marking shift ${order.shift_id} for resync.`);
+                        await db.shifts.update(order.shift_id, { is_synced: 0 });
+                        continue; // Skip this order, wait for next sync cycle after shift is synced
                     } else {
                         console.error("Order Sync Error:", orderError);
                         alert(`Gagal sinkron Order: ${orderError.message}\nCode: ${orderError.code}\nDetail: ${orderError.details}`);

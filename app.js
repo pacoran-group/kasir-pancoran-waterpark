@@ -2,6 +2,12 @@
 // Main UI logic and state management
 
 // ================================================================
+// Webhook Configuration
+// ================================================================
+// Masukkan URL Custom Webhook dari Make.com / n8n / platform lainnya
+const REPORT_WEBHOOK_URL = "MASUKKAN_URL_WEBHOOK_ANDA_DISINI";
+
+// ================================================================
 // Application State
 // ================================================================
 const state = {
@@ -539,6 +545,130 @@ window.loadTodayHistory = async function () {
 }
 
 // ================================================================
+// PRINT DAILY REPORT (Manual Handover to Finance)
+// ================================================================
+window.printDailyReport = async function() {
+    if (!state.currentShift) {
+        alert("Tidak ada shift aktif untuk dicetak.");
+        return;
+    }
+
+    try {
+        // Ambil semua order pada shift ini
+        const allOrders = await db.orders.where('shift_id').equals(state.currentShift.id).toArray();
+        if (allOrders.length === 0) {
+            alert("Belum ada transaksi di shift ini.");
+            return;
+        }
+
+        let totalCash = 0, totalQris = 0, totalTransfer = 0, totalAmount = 0;
+        let totalGuests = 0;
+
+        allOrders.forEach(o => {
+            totalAmount += o.total_price;
+            totalGuests += o.total_guests;
+            if (o.payment_method === 'cash') totalCash += o.total_price;
+            else if (o.payment_method === 'qris') totalQris += o.total_price;
+            else if (o.payment_method === 'transfer') totalTransfer += o.total_price;
+        });
+
+        const dateStr = new Date().toLocaleString('id-ID', {
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+
+        // Buat window baru untuk nge-print dengan ukuran kertas struk (80mm)
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Laporan Transaksi Kasir</title>
+                <style>
+                    body { font-family: monospace; width: 100%; max-width: 300px; margin: 0 auto; padding: 10px; color: #000; }
+                    @page { size: auto; margin: 5mm; }
+                    hr { border: none; border-top: 1px dashed #000; margin: 10px 0; }
+                    .row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
+                    .header { text-align: center; margin-bottom: 15px; }
+                    .bold { font-weight: bold; }
+                    .footer { text-align: center; font-size: 11px; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2 style="margin: 0; font-size: 18px;">PANCORAN WATERPARK</h2>
+                    <div style="font-size: 14px; margin-top: 5px;">LAPORAN TRANSAKSI SHIFT</div>
+                    <div style="font-size: 12px; margin-top: 3px;">Terminal #01</div>
+                </div>
+                
+                <div style="font-size: 13px; margin-bottom: 10px;">
+                    <div>Waktu Cetak : ${dateStr}</div>
+                    <div>Nama Kasir  : ${state.currentStaff?.name || '-'}</div>
+                    <div>Waktu Buka  : ${new Date(state.currentShift.opened_at).toLocaleString('id-ID')}</div>
+                </div>
+                
+                <hr>
+                <div class="row">
+                    <span>Total Transaksi:</span>
+                    <span>${allOrders.length}</span>
+                </div>
+                <div class="row">
+                    <span>Total Pengunjung:</span>
+                    <span>${totalGuests} pax</span>
+                </div>
+                <hr>
+                
+                <div class="row">
+                    <span>Tunai (Cash):</span>
+                    <span>${formatRp(totalCash)}</span>
+                </div>
+                <div class="row">
+                    <span>QRIS:</span>
+                    <span>${formatRp(totalQris)}</span>
+                </div>
+                <div class="row">
+                    <span>Transfer:</span>
+                    <span>${formatRp(totalTransfer)}</span>
+                </div>
+                
+                <hr>
+                <div class="row bold" style="font-size: 16px;">
+                    <span>TOTAL PENDAPATAN:</span>
+                    <span>${formatRp(totalAmount)}</span>
+                </div>
+                <hr>
+                
+                <div class="footer">
+                    <p>Laporan ini dicetak sebagai<br>bukti cross-check (handover) ke bagian Finance.</p>
+                    <div style="margin-top: 30px; display: flex; justify-content: space-between; padding: 0 10px;">
+                        <div style="text-align: center;">
+                            <div>Diserahkan,</div>
+                            <div style="margin-top: 40px;">( ${state.currentStaff?.name || 'Kasir'} )</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div>Diterima,</div>
+                            <div style="margin-top: 40px;">( Finance )</div>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        
+        // Timeout agar browser me-render HTML dulu
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 500);
+
+    } catch (err) {
+        console.error("Print Report Error:", err);
+        alert("Gagal mencetak laporan.");
+    }
+}
+
+// ================================================================
 // BOOKING FEATURE
 // ================================================================
 
@@ -886,6 +1016,122 @@ window.saveBooking = async function(event) {
 };
 
 // ================================================================
+// Closing Shift & Email Report
+// ================================================================
+
+function generateCSV(orders) {
+    const headers = [
+        "order_number", "total_guests", "adult_count", "child_count", 
+        "free_count", "adult_price", "subtotal", "discount_amount", 
+        "total_price", "payment_method", "visitor_source", 
+        "booking_ref", "created_at"
+    ];
+    
+    let csvRows = [];
+    csvRows.push(headers.join(","));
+    
+    orders.forEach(order => {
+        const row = [
+            order.order_number || "",
+            order.total_guests || 0,
+            order.adult_count || 0,
+            order.child_count || 0,
+            order.free_count || 0,
+            order.adult_price || 0,
+            order.subtotal || 0,
+            order.discount_amount || 0,
+            order.total_price || 0,
+            order.payment_method || "",
+            order.visitor_source || "",
+            order.booking_ref || "",
+            order.created_at || ""
+        ];
+        const escapedRow = row.map(val => {
+            const str = String(val);
+            if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        });
+        csvRows.push(escapedRow.join(","));
+    });
+    
+    return csvRows.join("\n");
+}
+
+async function sendClosingReportWebhook(shiftData) {
+    if (!REPORT_WEBHOOK_URL || REPORT_WEBHOOK_URL === "MASUKKAN_URL_WEBHOOK_ANDA_DISINI") {
+        console.warn("Webhook URL belum diatur.");
+        return false;
+    }
+    
+    try {
+        const orders = await db.orders.where({ shift_id: shiftData.id }).toArray();
+        let totalCash = 0, totalQris = 0, totalTransfer = 0;
+        let totalPax = 0;
+        let regulerPax = 0, sekolahPax = 0;
+        let totalDiskon = 0;
+        let grossSubtotal = 0;
+
+        orders.forEach(order => {
+            if (order.payment_method === 'cash') totalCash += order.total_price;
+            else if (order.payment_method === 'qris') totalQris += order.total_price;
+            else if (order.payment_method === 'transfer') totalTransfer += order.total_price;
+            
+            totalPax += order.total_guests;
+            grossSubtotal += order.subtotal;
+            totalDiskon += order.discount_amount || 0;
+
+            if (order.adult_price === state.prices.adult_rombongan) {
+                sekolahPax += order.total_guests;
+            } else {
+                regulerPax += order.total_guests;
+            }
+        });
+
+        // Buat file CSV mentah dan jadikan base64
+        const csvContent = generateCSV(orders);
+        const base64CSV = btoa(unescape(encodeURIComponent(csvContent)));
+
+        const payload = {
+            kasir_name: state.currentStaff?.name || "Kasir",
+            tanggal: new Date(shiftData.opened_at).toLocaleDateString('id-ID'),
+            waktu_buka: new Date(shiftData.opened_at).toLocaleString('id-ID'),
+            waktu_tutup: new Date(shiftData.closed_at).toLocaleString('id-ID'),
+            jumlah_transaksi: orders.length,
+            jumlah_pengunjung: totalPax,
+            rincian_pengunjung: `Reguler: ${regulerPax} org, Sekolah/Rombongan: ${sekolahPax} org`,
+            total_diskon: formatRp(totalDiskon),
+            pendapatan_kotor: formatRp(grossSubtotal),
+            total_cash: formatRp(totalCash),
+            total_qris: formatRp(totalQris),
+            total_transfer: formatRp(totalTransfer),
+            sistem_total: formatRp(totalCash + totalQris + totalTransfer),
+            fisik_uang: formatRp(shiftData.counted_cash),
+            selisih: formatRp(shiftData.difference),
+            catatan: shiftData.notes || "-",
+            attachment_csv_base64: base64CSV, // File data
+            attachment_filename: `Laporan_Shift_Pancoran_Waterpark_tgl_${new Date(shiftData.opened_at).toLocaleDateString('id-ID').replace(/\//g, '-')}.csv`
+        };
+
+        const response = await fetch(REPORT_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) throw new Error("Network response was not ok");
+        console.log("Webhook sent successfully");
+        return true;
+    } catch (err) {
+        console.error("Failed to send webhook:", err);
+        return false;
+    }
+}
+
+// ================================================================
 // Closing Shift
 // ================================================================
 async function showClosingScreen() {
@@ -955,10 +1201,29 @@ async function submitClosingShift() {
 
         if (navigator.onLine && window.supabaseInstance) {
             const shiftData = await db.shifts.get(state.currentShift.id);
-            await window.supabaseInstance.from('shifts').upsert([shiftData]);
+            const cleanShiftData = { ...shiftData };
+            delete cleanShiftData.is_synced; // Remove local-only field before sending to Supabase
+            await window.supabaseInstance.from('shifts').upsert([cleanShiftData]);
         }
 
-        alert("Shift berhasil ditutup!");
+        // --- KIRIM REPORT KE WEBHOOK ---
+        const btnConfirm = document.getElementById('confirm-closing-btn');
+        const originalText = btnConfirm.textContent;
+        btnConfirm.textContent = 'Mengirim Data ke Server...';
+        btnConfirm.disabled = true;
+
+        const shiftDataUpdated = await db.shifts.get(state.currentShift.id);
+        const webhookSent = await sendClosingReportWebhook(shiftDataUpdated);
+
+        btnConfirm.textContent = originalText;
+        btnConfirm.disabled = false;
+
+        if (webhookSent) {
+            alert("Shift berhasil ditutup dan Data Laporan terkirim!");
+        } else {
+            alert("Shift ditutup, namun GAGAL mengirim laporan ke server. Harap pastikan koneksi/URL Webhook benar.");
+        }
+
         state.currentStaff = null;
         state.currentShift = null;
         showScreen('login');
