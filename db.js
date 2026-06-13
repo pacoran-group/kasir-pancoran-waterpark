@@ -53,66 +53,7 @@ async function seedMasterData() {
             console.log("Local master data seeded.");
         }
 
-        // Seed dummy bookings untuk hari ini (testing)
-        const bookingCount = await db.bookings.count();
-        if (bookingCount === 0) {
-            const today = new Date().toISOString().slice(0, 10);
-            const unitId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
-            await db.bookings.bulkAdd([
-                {
-                    id: 'd1eebc99-9c0b-4ef8-bb6d-6bb9bd380a14',
-                    unit_id: unitId,
-                    booking_number: 'BK-' + today.replace(/-/g,'') + '-001',
-                    group_name: 'SDN Pancoran 05',
-                    contact_name: 'Pak Budi',
-                    contact_phone: '08211234567',
-                    visit_date: today,
-                    arrival_time: '09:00',
-                    total_guests: 52,
-                    adult_count: 40,
-                    child_count: 12,
-                    booking_type: 'sekolah',  // → harga Rp 20.000 jika >= 30 pax
-                    notes: 'Mohon siapkan area loker',
-                    status: 'pending',
-                    created_at: new Date().toISOString()
-                },
-                {
-                    id: 'e2eebc99-9c0b-4ef8-bb6d-6bb9bd380a15',
-                    unit_id: unitId,
-                    booking_number: 'BK-' + today.replace(/-/g,'') + '-002',
-                    group_name: 'Keluarga Besar Pak Hendra',
-                    contact_name: 'Pak Hendra',
-                    contact_phone: '08567654321',
-                    visit_date: today,
-                    arrival_time: '10:00',
-                    total_guests: 45,
-                    adult_count: 35,
-                    child_count: 10,
-                    booking_type: 'umum',  // → tetap Rp 28.000 (bukan sekolah)
-                    notes: 'Acara reuni keluarga',
-                    status: 'pending',
-                    created_at: new Date().toISOString()
-                },
-                {
-                    id: 'f3eebc99-9c0b-4ef8-bb6d-6bb9bd380a16',
-                    unit_id: unitId,
-                    booking_number: 'BK-' + today.replace(/-/g,'') + '-003',
-                    group_name: 'SMP Al-Hikmah Jakarta',
-                    contact_name: 'Bu Sari',
-                    contact_phone: '08567654321',
-                    visit_date: today,
-                    arrival_time: '10:30',
-                    total_guests: 88,
-                    adult_count: 60,
-                    child_count: 28,
-                    booking_type: 'sekolah',  // → harga Rp 20.000
-                    notes: '',
-                    status: 'pending',
-                    created_at: new Date().toISOString()
-                }
-            ]);
-            console.log("Dummy bookings seeded for today.");
-        }
+
     } catch (e) {
         console.error("Seed error:", e);
     }

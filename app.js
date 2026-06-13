@@ -737,9 +737,9 @@ window.loadAllBookings = async function () {
         // Load all
         let bookings = await db.bookings.toArray();
         
-        // Tampilkan semua data, KECUALI yang jadwalnya hari ini DAN masih pending
+        // Tampilkan hanya data yang masih pending, dan KECUALI jadwal hari ini
         // (Karena yang hari ini dan masih pending sudah tampil di halaman depan/Sales)
-        bookings = bookings.filter(b => !(b.visit_date === today && b.status === 'pending'));
+        bookings = bookings.filter(b => b.status === 'pending' && b.visit_date !== today);
 
         // Sort descending by date
         bookings.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
