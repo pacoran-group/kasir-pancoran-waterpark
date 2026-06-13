@@ -5,7 +5,7 @@
 // Webhook Configuration
 // ================================================================
 // Masukkan URL Custom Webhook dari Make.com / n8n / platform lainnya
-const REPORT_WEBHOOK_URL = "MASUKKAN_URL_WEBHOOK_ANDA_DISINI";
+const REPORT_WEBHOOK_URL = "https://hook.eu1.make.com/qhnfq865gukfpcd8biliwg17dftfp5or";
 
 // ================================================================
 // Application State
@@ -545,31 +545,18 @@ window.loadTodayHistory = async function () {
 }
 
 // ================================================================
-// PRINT DAILY REPORT (Manual Handover to Finance)
+// PRINT Z-REPORT (Automatic on Closing Shift)
 // ================================================================
-window.printDailyReport = async function() {
-    if (!state.currentShift) {
-        alert("Tidak ada shift aktif untuk dicetak.");
-        return;
-    }
+window.printZReport = async function(shiftData) {
+    if (!shiftData) return;
 
     try {
         // Ambil semua order pada shift ini
-        const allOrders = await db.orders.where('shift_id').equals(state.currentShift.id).toArray();
-        if (allOrders.length === 0) {
-            alert("Belum ada transaksi di shift ini.");
-            return;
-        }
-
-        let totalCash = 0, totalQris = 0, totalTransfer = 0, totalAmount = 0;
+        const allOrders = await db.orders.where('shift_id').equals(shiftData.id).toArray();
         let totalGuests = 0;
 
         allOrders.forEach(o => {
-            totalAmount += o.total_price;
             totalGuests += o.total_guests;
-            if (o.payment_method === 'cash') totalCash += o.total_price;
-            else if (o.payment_method === 'qris') totalQris += o.total_price;
-            else if (o.payment_method === 'transfer') totalTransfer += o.total_price;
         });
 
         const dateStr = new Date().toLocaleString('id-ID', {
@@ -582,7 +569,7 @@ window.printDailyReport = async function() {
         printWindow.document.write(`
             <html>
             <head>
-                <title>Laporan Transaksi Kasir</title>
+                <title>Z-Report Kasir</title>
                 <style>
                     body { font-family: monospace; width: 100%; max-width: 300px; margin: 0 auto; padding: 10px; color: #000; }
                     @page { size: auto; margin: 5mm; }
@@ -596,14 +583,15 @@ window.printDailyReport = async function() {
             <body>
                 <div class="header">
                     <h2 style="margin: 0; font-size: 18px;">PANCORAN WATERPARK</h2>
-                    <div style="font-size: 14px; margin-top: 5px;">LAPORAN TRANSAKSI SHIFT</div>
+                    <div style="font-size: 14px; margin-top: 5px;">Z-REPORT (LAPORAN PENUTUPAN)</div>
                     <div style="font-size: 12px; margin-top: 3px;">Terminal #01</div>
                 </div>
                 
                 <div style="font-size: 13px; margin-bottom: 10px;">
                     <div>Waktu Cetak : ${dateStr}</div>
                     <div>Nama Kasir  : ${state.currentStaff?.name || '-'}</div>
-                    <div>Waktu Buka  : ${new Date(state.currentShift.opened_at).toLocaleString('id-ID')}</div>
+                    <div>Waktu Buka  : ${new Date(shiftData.opened_at).toLocaleString('id-ID')}</div>
+                    <div>Waktu Tutup : ${new Date(shiftData.closed_at).toLocaleString('id-ID')}</div>
                 </div>
                 
                 <hr>
@@ -618,27 +606,36 @@ window.printDailyReport = async function() {
                 <hr>
                 
                 <div class="row">
-                    <span>Tunai (Cash):</span>
-                    <span>${formatRp(totalCash)}</span>
+                    <span>Sistem Cash:</span>
+                    <span>${formatRp(shiftData.system_cash)}</span>
                 </div>
                 <div class="row">
-                    <span>QRIS:</span>
-                    <span>${formatRp(totalQris)}</span>
+                    <span>Sistem QRIS:</span>
+                    <span>${formatRp(shiftData.system_qris)}</span>
                 </div>
                 <div class="row">
-                    <span>Transfer:</span>
-                    <span>${formatRp(totalTransfer)}</span>
-                </div>
-                
-                <hr>
-                <div class="row bold" style="font-size: 16px;">
-                    <span>TOTAL PENDAPATAN:</span>
-                    <span>${formatRp(totalAmount)}</span>
+                    <span>Sistem Transfer:</span>
+                    <span>${formatRp(shiftData.system_transfer)}</span>
                 </div>
                 <hr>
                 
+                <div class="row bold" style="font-size: 14px;">
+                    <span>TOTAL SISTEM:</span>
+                    <span>${formatRp(shiftData.system_cash + shiftData.system_qris + shiftData.system_transfer)}</span>
+                </div>
+                <hr>
+                
+                <div class="row bold" style="font-size: 15px;">
+                    <span>UANG FISIK:</span>
+                    <span>${formatRp(shiftData.counted_cash)}</span>
+                </div>
+                <div class="row bold" style="font-size: 15px; color: ${shiftData.difference < 0 ? 'red' : 'black'};">
+                    <span>SELISIH:</span>
+                    <span>${formatRp(shiftData.difference)}</span>
+                </div>
+                
+                <hr>
                 <div class="footer">
-                    <p>Laporan ini dicetak sebagai<br>bukti cross-check (handover) ke bagian Finance.</p>
                     <div style="margin-top: 30px; display: flex; justify-content: space-between; padding: 0 10px;">
                         <div style="text-align: center;">
                             <div>Diserahkan,</div>
@@ -1223,6 +1220,9 @@ async function submitClosingShift() {
         } else {
             alert("Shift ditutup, namun GAGAL mengirim laporan ke server. Harap pastikan koneksi/URL Webhook benar.");
         }
+
+        // Panggil print Z-Report setelah penutupan shift berhasil
+        await printZReport(shiftDataUpdated);
 
         state.currentStaff = null;
         state.currentShift = null;
