@@ -1453,5 +1453,5 @@ window.downloadFinanceExcel = function() {
     // Unduh file (format: Laporan_Finance_Pancoran_Waterpark_tgl.xlsx)
     const startDate = document.getElementById('finance-start-date').value;
     const endDate = document.getElementById('finance-end-date').value;
-    XLSX.writeFile(workbook, \`Laporan_Finance_Pancoran_${startDate}_sd_${endDate}.xlsx\`);
+    XLSX.writeFile(workbook, `Laporan_Finance_Pancoran_${startDate}_sd_${endDate}.xlsx`);
 }
