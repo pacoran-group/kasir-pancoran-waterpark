@@ -986,7 +986,41 @@ input:focus, select:focus, textarea:focus {
     .ticket-footer {
         font-size: 3.5px; line-height: 1; color: #000;
         margin-top: 0.5mm; display: flex; gap: 4px; opacity: 0.8;
-    }
+}
+
+/* ================================================================
+   FINANCE DASHBOARD
+   ================================================================ */
+#finance-screen {
+    background: #f8fafc;
+    min-height: 100vh;
+}
+.finance-table th, .finance-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #f1f5f9;
+}
+.finance-table tr:hover {
+    background: #f8fafc;
+}
+.finance-summary-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    flex: 1;
+    box-shadow: var(--shadow-sm);
+}
+.finance-summary-title {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+.finance-summary-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
 }
 
 /* ================================================================

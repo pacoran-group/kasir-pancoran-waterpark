@@ -1280,3 +1280,178 @@ function showPrintQueueNotice(orderNum) {
         setTimeout(() => toast.remove(), 300);
     }, 4000);
 }
+
+// ================================================================
+// FINANCE DASHBOARD (Accounting Portal)
+// ================================================================
+
+let financeLoadedData = [];
+
+window.showFinanceLogin = function() {
+    const pin = prompt("Masukkan PIN Khusus Finance:");
+    if (pin === "888888") {
+        showScreen('finance');
+        // Set default dates to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('finance-start-date').value = today;
+        document.getElementById('finance-end-date').value = today;
+    } else if (pin !== null) {
+        alert("PIN Finance salah!");
+    }
+}
+
+window.loadFinanceData = async function() {
+    if (!window.supabaseInstance) {
+        alert("Koneksi ke database server (Supabase) belum tersedia. Harap periksa koneksi internet Anda.");
+        return;
+    }
+
+    const startInput = document.getElementById('finance-start-date').value;
+    const endInput = document.getElementById('finance-end-date').value;
+
+    if (!startInput || !endInput) {
+        alert("Harap pilih tanggal mulai dan tanggal akhir.");
+        return;
+    }
+
+    const btn = document.querySelector('#finance-screen .btn.primary');
+    const originalText = btn.textContent;
+    btn.textContent = "Menarik Data...";
+    btn.disabled = true;
+    
+    // Supabase date range query (appending time to include full end day)
+    const startDateStr = startInput + "T00:00:00.000Z";
+    const endDateStr = endInput + "T23:59:59.999Z";
+
+    try {
+        const { data, error } = await window.supabaseInstance
+            .from('orders')
+            .select('*')
+            .gte('created_at', startDateStr)
+            .lte('created_at', endDateStr)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        financeLoadedData = data || [];
+        renderFinanceTable();
+
+    } catch (err) {
+        console.error("Finance fetch error:", err);
+        alert("Gagal menarik data dari server.");
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function renderFinanceTable() {
+    const tbody = document.getElementById('finance-table-body');
+    const table = document.getElementById('finance-table');
+    const emptyState = document.getElementById('finance-empty');
+    const btnDownload = document.getElementById('btn-download-excel');
+    const summaryContainer = document.getElementById('finance-summary');
+
+    if (financeLoadedData.length === 0) {
+        table.style.display = 'none';
+        btnDownload.style.display = 'none';
+        emptyState.style.display = 'flex';
+        emptyState.querySelector('p').textContent = "Tidak ada transaksi pada rentang tanggal tersebut.";
+        summaryContainer.innerHTML = '';
+        return;
+    }
+
+    // Process summary
+    let totalRevenue = 0;
+    let totalCash = 0;
+    let totalQris = 0;
+    let totalTransfer = 0;
+    let totalPax = 0;
+
+    tbody.innerHTML = '';
+    financeLoadedData.forEach(o => {
+        totalRevenue += o.total_price || 0;
+        totalPax += o.total_guests || 0;
+        
+        if (o.payment_method === 'cash') totalCash += o.total_price;
+        else if (o.payment_method === 'qris') totalQris += o.total_price;
+        else if (o.payment_method === 'transfer') totalTransfer += o.total_price;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${new Date(o.created_at).toLocaleString('id-ID')}</td>
+            <td><strong>${o.order_number}</strong></td>
+            <td>${o.total_guests} org</td>
+            <td>${o.visitor_source || 'Walk-in'}</td>
+            <td><span style="background: #e2e8f0; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">${(o.payment_method || '').toUpperCase()}</span></td>
+            <td>${formatRp(o.subtotal)}</td>
+            <td>${o.discount_amount > 0 ? formatRp(o.discount_amount) : '-'}</td>
+            <td><strong>${formatRp(o.total_price)}</strong></td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Show summary cards
+    summaryContainer.innerHTML = `
+        <div class="finance-summary-card">
+            <div class="finance-summary-title">Total Pendapatan</div>
+            <div class="finance-summary-value" style="color: #10b981;">${formatRp(totalRevenue)}</div>
+        </div>
+        <div class="finance-summary-card">
+            <div class="finance-summary-title">Rincian Pembayaran</div>
+            <div style="font-size: 13px; margin-top: 5px;">Cash: <strong>${formatRp(totalCash)}</strong></div>
+            <div style="font-size: 13px;">QRIS: <strong>${formatRp(totalQris)}</strong></div>
+            <div style="font-size: 13px;">Transfer: <strong>${formatRp(totalTransfer)}</strong></div>
+        </div>
+        <div class="finance-summary-card">
+            <div class="finance-summary-title">Total Transaksi</div>
+            <div class="finance-summary-value">${financeLoadedData.length} <span style="font-size: 14px; color: #64748b; font-weight: normal;">struk</span></div>
+        </div>
+        <div class="finance-summary-card">
+            <div class="finance-summary-title">Total Pengunjung</div>
+            <div class="finance-summary-value">${totalPax} <span style="font-size: 14px; color: #64748b; font-weight: normal;">pax</span></div>
+        </div>
+    `;
+
+    table.style.display = 'table';
+    btnDownload.style.display = 'inline-flex';
+    emptyState.style.display = 'none';
+}
+
+window.downloadFinanceExcel = function() {
+    if (!financeLoadedData || financeLoadedData.length === 0) return;
+
+    // Persiapkan data untuk Excel
+    const excelData = financeLoadedData.map(o => ({
+        "Tanggal Transaksi": new Date(o.created_at).toLocaleDateString('id-ID'),
+        "Waktu": new Date(o.created_at).toLocaleTimeString('id-ID'),
+        "Nomor Order": o.order_number,
+        "Shift ID": o.shift_id,
+        "Kategori": o.visitor_source || "walk-in",
+        "Dewasa (Pax)": o.adult_count || 0,
+        "Anak (Pax)": o.child_count || 0,
+        "Gratis (Pax)": o.free_count || 0,
+        "Total Pax": o.total_guests || 0,
+        "Harga Dewasa": o.adult_price || 0,
+        "Subtotal": o.subtotal || 0,
+        "Diskon (Rp)": o.discount_amount || 0,
+        "Total Bayar (Rp)": o.total_price || 0,
+        "Metode Pembayaran": (o.payment_method || "").toUpperCase(),
+        "Catatan Booking": o.booking_ref || "-"
+    }));
+
+    // Buat worksheet dan workbook menggunakan SheetJS
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    // Autofit column width
+    const wscols = Object.keys(excelData[0]).map(key => ({ wch: Math.max(key.length, 15) }));
+    worksheet['!cols'] = wscols;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Transaksi");
+
+    // Unduh file (format: Laporan_Finance_Pancoran_Waterpark_tgl.xlsx)
+    const startDate = document.getElementById('finance-start-date').value;
+    const endDate = document.getElementById('finance-end-date').value;
+    XLSX.writeFile(workbook, \`Laporan_Finance_Pancoran_${startDate}_sd_${endDate}.xlsx\`);
+}
