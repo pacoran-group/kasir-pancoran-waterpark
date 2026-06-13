@@ -132,6 +132,16 @@ function switchTab(tabName) {
     const tab = document.getElementById(`tab-${tabName}`);
     if (tab) tab.classList.add('active');
 
+    // Toggle summary panel visibility
+    const summaryPanel = document.getElementById('summary-panel');
+    if (summaryPanel) {
+        if (tabName === 'sales') {
+            summaryPanel.style.display = 'flex';
+        } else {
+            summaryPanel.style.display = 'none';
+        }
+    }
+
     // Load data when switching tabs
     if (tabName === 'booking') loadAllBookings();
     if (tabName === 'history') loadTodayHistory();
