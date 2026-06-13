@@ -1110,6 +1110,7 @@ async function sendClosingReportWebhook(shiftData) {
             fisik_uang: formatRp(shiftData.counted_cash),
             selisih: formatRp(shiftData.difference),
             catatan: shiftData.notes || "-",
+            raw_orders_data: orders, // Data JSON array asli untuk dimasukkan per baris ke Google Sheets oleh Make.com
             attachment_csv_base64: csvContent, // Diisi raw text agar Make.com langsung menulis teks CSV ke dalam file
             attachment_csv_raw: csvContent,
             attachment_filename: `Laporan_Shift_Pancoran_Waterpark_tgl_${new Date(shiftData.opened_at).toLocaleDateString('id-ID').replace(/\//g, '-')}.csv`
