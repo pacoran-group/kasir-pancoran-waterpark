@@ -509,14 +509,18 @@ window.loadTodayHistory = async function () {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Memuat...</p></div>';
 
     try {
-        const today = new Date().toISOString().slice(0, 10);
+        if (!state.currentShift) {
+            list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada shift aktif. Silakan buka shift terlebih dahulu.</p></div>';
+            return;
+        }
+
         const allOrders = await db.orders.toArray();
         const todayOrders = allOrders
-            .filter(o => o.created_at && o.created_at.startsWith(today))
+            .filter(o => o.shift_id === state.currentShift.id)
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         if (todayOrders.length === 0) {
-            list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada transaksi hari ini</p></div>';
+            list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada transaksi di shift ini</p></div>';
             return;
         }
 
@@ -1086,9 +1090,8 @@ async function sendClosingReportWebhook(shiftData) {
             }
         });
 
-        // Buat file CSV mentah dan jadikan base64
+        // Buat file CSV mentah (langsung dikirim sebagai teks agar Make.com bisa menulisnya langsung ke file)
         const csvContent = generateCSV(orders);
-        const base64CSV = btoa(unescape(encodeURIComponent(csvContent)));
 
         const payload = {
             kasir_name: state.currentStaff?.name || "Kasir",
@@ -1107,7 +1110,8 @@ async function sendClosingReportWebhook(shiftData) {
             fisik_uang: formatRp(shiftData.counted_cash),
             selisih: formatRp(shiftData.difference),
             catatan: shiftData.notes || "-",
-            attachment_csv_base64: base64CSV, // File data
+            attachment_csv_base64: csvContent, // Diisi raw text agar Make.com langsung menulis teks CSV ke dalam file
+            attachment_csv_raw: csvContent,
             attachment_filename: `Laporan_Shift_Pancoran_Waterpark_tgl_${new Date(shiftData.opened_at).toLocaleDateString('id-ID').replace(/\//g, '-')}.csv`
         };
 
