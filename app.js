@@ -1337,9 +1337,11 @@ window.loadFinanceData = async function() {
         return;
     }
 
-    const btn = document.querySelector('#finance-screen .btn.primary');
-    const originalText = btn.textContent;
-    btn.textContent = "Menarik Data...";
+    const btn = document.getElementById('btn-tampilkan-data');
+    if (!btn) return; // Prevent crash if button is missing
+
+    const originalText = btn.innerHTML;
+    btn.innerHTML = "Menarik Data...";
     btn.disabled = true;
     
     // Supabase date range query (appending time to include full end day)
