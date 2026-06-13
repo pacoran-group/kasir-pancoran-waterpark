@@ -30,7 +30,8 @@ const state = {
 const screens = {
     login: document.getElementById('login-screen'),
     cashier: document.getElementById('cashier-screen'),
-    closing: document.getElementById('closing-screen')
+    closing: document.getElementById('closing-screen'),
+    finance: document.getElementById('finance-screen')
 };
 
 // ================================================================
